@@ -1,7 +1,9 @@
 # ASMSA
+Analysis and Sampling of Molecular Simulations by adversarial Autoencoders
+
 
 ## Description
-Analysis and Sampling of Molecular Simulations by adversarial Autoencoders
+TODO
 
 ## Badges
 TODO
