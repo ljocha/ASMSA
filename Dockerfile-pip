@@ -1,0 +1,20 @@
+FROM python:3-slim as build
+
+USER root
+
+WORKDIR /tmp
+COPY requirements.txt .
+RUN apt update -y && apt install build-essential libz-dev -y
+RUN python -m pip install --target=/tmp/dependencies -r requirements.txt
+
+
+FROM ubuntu:20.04 
+
+USER root
+
+COPY --from=build /tmp/dependencies /opt/dependencies
+
+ENV PYTHONPATH="/opt/dependencies:${PYTHONPATH}"
+RUN apt-get update -y && apt-get upgrade -y
+RUN apt-get install python3 vim -y
+
