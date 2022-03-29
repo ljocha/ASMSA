@@ -2,8 +2,11 @@ name: pyenv
 channels:
     - conda-forge
 dependencies:
-    - pip
     - keras
     - numpy
     - mdtraj
     - jupyter
+    - matplotlib
+    - pip
+    - pip:
+        - tensorflow
