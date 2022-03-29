@@ -190,7 +190,7 @@ singleuser:
       storageAccessModes: [ReadWriteMany]
   image:
     name: spectraes/asmsa
-    tag: "t1"
+    tag: "j0"
     pullPolicy:
     pullSecrets: []
   startTimeout: 300
