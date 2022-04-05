@@ -2,12 +2,6 @@ name: pyenv
 channels:
     - conda-forge
 dependencies:
-    # packages to run with jupyterhub
-    - jupyter
-    - ipykernel
-    - nb_conda_kernels
-
-    # packages needed for ASMSA computation
     - keras
     - numpy
     - mdtraj
