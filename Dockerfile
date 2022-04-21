@@ -18,7 +18,7 @@ COPY . /home/jovyan
 RUN useradd -m -u 1000 jovyan
 RUN chown -R 1000:1000 /home/jovyan
 
-RUN apt install -y krb5-client
+RUN apt install -y krb5-client sshfs
 COPY krb5.conf /etc
 
 ENTRYPOINT []
