@@ -9,7 +9,7 @@ RUN apt install -y python3-pip
 
 RUN pip3 install jupyterhub
 
-RUN pip3 install mdtraj maplotlib
+RUN pip3 install mdtraj matplotlib
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
