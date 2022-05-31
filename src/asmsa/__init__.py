@@ -136,7 +136,7 @@ class Molecule:
 				t1 = self.atypes[self.angles[i,1]]
 				t2 = self.atypes[self.angles[i,2]]
 				if (_match_type(t0,a[0]) and _match_type(t1,a[1]) and _match_type(t2,a[2])) or (_match_type(t0,a[2]) and _match_type(t1,a[1]) and _match_type(t2,a[0])):
-					self.angles_th0[i] = a[3]
+					self.angles_th0[i] = a[3] / 180. * np.pi
 					self.angles_cth[i] = a[4]
 					break # first match only
 
@@ -179,7 +179,9 @@ class Molecule:
 
 		for i in range(self.bonds.shape[0]):
 			l3 = geoms[self.bonds[i,0],:,:] - geoms[self.bonds[i,1],:,:]
-			out[i] = np.linalg.norm(l3,axis=0) - self.bonds_b0[i]
+
+			# this is what original code does but shouldn't these be normalized (as angles) too?
+			out[i] = np.linalg.norm(l3,axis=0) # - self.bonds_b0[i]	/ ...
 
 		return out
 
