@@ -1,14 +1,153 @@
 import mdtraj as md
 import numpy as np
 import re
+import os.path
+import logging
+
+def _parse_top(top):
+	anums = []
+	types = []
+	bonds = []
+	angles = []
+	dihedrals = []
+	sect = 'unknown'
+	with open(top) as tf:
+		for l in tf:
+			if re.match('\s*[;#]',l) or re.match('\s*$',l): continue
+			m = re.match('\[\s*(\w+)\s*\]',l)
+			if m:
+				sect = m.group(1)
+				continue
+			elif sect == 'atoms':
+				m = re.match('\s*(\d+)\s+(\w+)',l)
+				if m:
+					anums.append(int(m.group(1)))
+					types.append(m.group(2))
+					continue
+			elif sect == 'bonds':
+				m = re.match('\s*(\d+)\s+(\d+)',l)
+				if m:
+					bonds.append((int(m.group(1)),int(m.group(2))))
+					continue
+			elif sect == 'angles':
+				m = re.match('\s*(\d+)\s+(\d+)\s+(\d+)',l)
+				if m:
+					angles.append((int(m.group(1)),int(m.group(2)),int(m.group(3))))
+					continue
+			elif sect == 'dihedrals':
+				m = re.match('\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)',l)
+				if m:
+					dihedrals.append((int(m.group(1)),int(m.group(2)),int(m.group(3)),int(m.group(4)),int(m.group(5))))
+					continue
+			else: continue
+					
+			log.error(f"unexpected in [{sect}]: {l}")
+	
+	aidx = [ -1 ] * (max(anums) + 1)
+	for i,n in enumerate(anums):
+		aidx[n] = i
+
+	return (types,
+		np.array(list(map(lambda b: [aidx[b[0]], aidx[b[1]]], bonds)),dtype=np.int32),
+		np.array(list(map(lambda a: [aidx[a[0]], aidx[a[1]], aidx[a[2]]], angles)),dtype=np.int32),
+		np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
+																	filter(lambda d: d[4] == 4, dihedrals)
+															)),dtype=np.int32),
+		np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
+																	filter(lambda d: d[4] == 9, dihedrals)
+															)),dtype=np.int32)
+	)
+
+
+def _parse_ff(itpfile):
+	btypes = []
+	atypes = []
+	d4types = []
+	d9types = []
+
+	sect = 'unknown'
+	with open(itpfile) as itp:
+		for l in itp:
+			if re.match('\s*[;#]',l) or re.match('\s*$',l): continue
+			m = re.match('\[\s*(\S+)\s*\]',l)
+			if m:
+				sect = m.group(1)
+				continue
+			elif sect == 'bondtypes':
+				m = re.match('\s*(\S+)\s+(\S+)\s+\d+\s+(\S+)\s+(\S+)',l)
+				if m:
+					btypes.append((m.group(1), m.group(2), float(m.group(3)), float(m.group(4))))
+					continue
+			elif sect == 'angletypes':
+				m = re.match('\s*(\S+)\s+(\S+)\s+(\S+)\s+\d+\s+(\S+)\s+(\S+)',l)
+				if m:
+					atypes.append((m.group(1), m.group(2), m.group(3), float(m.group(4)), float(m.group(5))))
+					continue
+			elif sect == 'dihedrealtypes':
+				m = re.match('\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\S+)',l)
+				if m:
+					if m.group(5) == '4':
+						d4types.append((m.group(1), m.group(2), m.group(3), m.group(4), float(m.group(6)), float(m.group(7))))
+					elif m.group(5) == '9':
+						d9types.append((m.group(1), m.group(2), m.group(3), m.group(4), float(m.group(6)), float(m.group(7))))
+					continue
+			else: continue
+
+			log.error(f"unexpected in [{sect}]: {l}")
+	
+	return (btypes, atypes, d4types, d9types)
+
+
+def _match_type(atom,pattern):
+	return atom == pattern or (len(pattern) > 1 and atom[0] == pattern[0] and pattern[1] == '*')
+
 
 class Molecule:
 
-	def __init__(self,pdb,top,ff):
+	def __init__(self,pdb,top,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp'):
 		self.ref = md.load_pdb(pdb)
-		self.parse_top(top)
-		self.parse_ff(ff)
+		self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top)
+		btypes,atypes,d4types,d9types = _parse_ff(ff)
+		self._match_bonds(btypes)
+		self._match_angles(atypes)
+		self._match_dihed(d4types,d9types)
 		self.nb = None
+
+	def _match_bonds(self,btypes):
+		self.bonds_b0 = np.empty(self.bonds.shape[0],dtype=np.float32)
+		self.bonds_kb = np.empty(self.bonds.shape[0],dtype=np.float32)
+
+		for i in range(self.bonds.shape[0]):
+			for b in btypes:
+				t0 = self.atypes[self.bonds[i,0]]
+				t1 = self.atypes[self.bonds[i,1]]
+				if (_match_type(t0,b[0]) and _match_type(t1,b[1])) or (_match_type(t0,b[1]) and _match_type(t1,b[0])):
+					 self.bonds_b0[i] = b[2]
+					 self.bonds_kb[i] = b[3]
+					 break	# first match only
+
+	def _match_angles(self,atypes):
+		self.angles_th0 = np.empty(self.angles.shape[0],dtype=np.float32)
+		self.angles_cth = np.empty(self.angles.shape[0],dtype=np.float32)
+
+		for i in range(self.angles.shape[0]):
+			for a in atypes:
+				t0 = self.atypes[self.angles[i,0]]
+				t1 = self.atypes[self.angles[i,1]]
+				t2 = self.atypes[self.angles[i,2]]
+				if (_match_type(t0,a[0]) and _match_type(t1,a[1]) and _match_type(t2,a[2])) or (_match_type(t0,a[2]) and _match_type(t1,a[1]) and _match_type(t2,a[0])):
+					self.angles_th0[i] = a[3]
+					self.angles_cth[i] = a[4]
+					break # first match only
+
+		self.angles_2rth0 = 2. * np.reciprocal(self.angles_th0)
+		
+
+
+	def _match_dihed(self,d4types,d9types):
+		# TODO
+		pass
+
 
 # ....
 
@@ -31,68 +170,11 @@ class Molecule:
 	nb = asmsa.NonBond(self) ... ic(geoms)
 """
 
-	def parse_top(self,top):
-		anums = []
-		types = []
-		bonds = []
-		angles = []
-		dihedrals = []
-		sect = 'unknown'
-		with open(top) as tf:
-			for l in tf:
-				if re.match('\s*[;#]',l) or re.match('\s*$',l): continue
-				m = re.match('\[\s*(\w+)\s*\]',l)
-				if m:
-					sect = m.group(1)
-					continue
-				elif sect == 'atoms':
-					m = re.match('\s*(\d+)\s+(\w+)',l)
-					if m:
-						anums.append(int(m.group(1)))
-						types.append(m.group(2))
-						continue
-				elif sect == 'bonds':
-					m = re.match('\s*(\d+)\s+(\d+)',l)
-					if m:
-						bonds.append((int(m.group(1)),int(m.group(2))))
-						continue
-				elif sect == 'angles':
-					m = re.match('\s*(\d+)\s+(\d+)\s+(\d+)',l)
-					if m:
-						angles.append((int(m.group(1)),int(m.group(2)),int(m.group(3))))
-						continue
-				elif sect == 'dihedrals':
-					m = re.match('\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)',l)
-					if m:
-						dihedrals.append((int(m.group(1)),int(m.group(2)),int(m.group(3)),int(m.group(4)),int(m.group(5))))
-						continue
-				else: continue
-						
-				log.error(f"unexpected in [{sect}]: {l}")
-		
-		self.atypes = types
-		aidx = [ -1 ] * (max(anums) + 1)
-		for i,n in enumerate(anums):
-			aidx[n] = i
-
-		self.bonds = np.array(list(map(lambda b: [aidx[b[0]], aidx[b[1]]], bonds)),dtype=np.int32)
-		self.angles = np.array(list(map(lambda a: [aidx[a[0]], aidx[a[1]], aidx[a[2]]], angles)),dtype=np.int32)
-		self.dihed4 = np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
-																		filter(lambda d: d[4] == 4, dihedrals)
-																)),dtype=np.int32)
-		self.dihed9 = np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
-																		filter(lambda d: d[4] == 9, dihedrals)
-																)),dtype=np.int32)
-
-
-
-	def parse_ff(self,ff):
-		pass
 
 
 
 # geoms[atom][xyz][conf]
-	def ic_bonds(self,geoms):
+	def _ic_bonds(self,geoms):
 		out = np.empty([self.bonds.shape[0],geoms.shape[2]],dtype=np.float32)
 
 		for i in range(self.bonds.shape[0]):
@@ -101,7 +183,7 @@ class Molecule:
 
 		return out
 
-	def ic_angles(self,geoms):
+	def _ic_angles(self,geoms):
 		out = np.empty([self.angles.shape[0],geoms.shape[2]],dtype=np.float32)
 
 		for i in range(self.angles.shape[0]):
@@ -123,22 +205,27 @@ class Molecule:
 			nb = np.empty([0,geoms.shape[2]],dtype=float32)
 			
 		return np.concatenate((
-			self.ic_bonds(geoms),
-			self.ic_angles(geoms),
+			self._ic_bonds(geoms),
+			self._ic_angles(geoms),
 			nb
 			),axis=0)
 
 
-import logging
 logging.basicConfig(format='%(message)s')
 log = logging.getLogger(__name__)
 
 
 if __name__ == '__main__':
-	mol = Molecule('alaninedipeptide_H.pdb','topol.top',None)
+	mol = Molecule('alaninedipeptide_H.pdb','topol.top')
 
 	print(mol.atypes)
 	print(mol.bonds)
 	print(mol.angles)
 	print(mol.dihed4)
 	print(mol.dihed9)
+
+
+	print(_parse_ff(os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp'))
+
+	print(mol.bonds_b0)
+	print(mol.angles_th0)
