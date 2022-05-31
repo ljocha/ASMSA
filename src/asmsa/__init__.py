@@ -191,7 +191,8 @@ class Molecule:
 			v2 = geoms[self.angles[i,2],:,:] - geoms[self.angles[i,1],:,:]
 			rn1 = np.reciprocal(np.linalg.norm(v1,axis=0))
 			rn2 = np.reciprocal(np.linalg.norm(v2,axis=0))
-			aa = np.arccos(v1 * v2 * rn1 * rn2)
+			dot = np.einsum('ij,ij->j',v1,v2)
+			aa = np.arccos(dot * rn1 * rn2)
 			out[i] = (aa - .75 * self.angles_th0[i]) * self.angles_2rth0[i] # map 0.75 a0 -- 1.25 a0 to 0 -- 1
 
 		return out
@@ -202,7 +203,7 @@ class Molecule:
 		if self.nb is not None:
 			nb = self.nb.ic(geoms)
 		else:
-			nb = np.empty([0,geoms.shape[2]],dtype=float32)
+			nb = np.empty([0,geoms.shape[2]],dtype=np.float32)
 			
 		return np.concatenate((
 			self._ic_bonds(geoms),
