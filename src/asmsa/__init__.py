@@ -83,7 +83,7 @@ def _parse_ff(itpfile):
 				if m:
 					atypes.append((m.group(1), m.group(2), m.group(3), float(m.group(4)), float(m.group(5))))
 					continue
-			elif sect == 'dihedrealtypes':
+			elif sect == 'dihedraltypes':
 				m = re.match('\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\S+)',l)
 				if m:
 					if m.group(5) == '4':
@@ -99,7 +99,7 @@ def _parse_ff(itpfile):
 
 
 def _match_type(atom,pattern):
-	return atom == pattern or (len(pattern) > 1 and atom[0] == pattern[0] and pattern[1] == '*')
+	return atom == pattern or (len(pattern) > 1 and atom[0] == pattern[0] and pattern[1] == '*') or pattern == 'X'
 
 
 class Molecule:
@@ -118,35 +118,73 @@ class Molecule:
 		self.bonds_kb = np.empty(self.bonds.shape[0],dtype=np.float32)
 
 		for i in range(self.bonds.shape[0]):
+			matched = False
 			for b in btypes:
 				t0 = self.atypes[self.bonds[i,0]]
 				t1 = self.atypes[self.bonds[i,1]]
-				if (_match_type(t0,b[0]) and _match_type(t1,b[1])) or (_match_type(t0,b[1]) and _match_type(t1,b[0])):
+				if ((_match_type(t0,b[0]) and _match_type(t1,b[1]))
+						or (_match_type(t0,b[1]) and _match_type(t1,b[0]))):
 					 self.bonds_b0[i] = b[2]
 					 self.bonds_kb[i] = b[3]
+					 matched = True
 					 break	# first match only
+			if not matched:
+				self.bonds_b0[i] = np.nan
+				self.bonds_kb[i] = np.nan
+				log.warn(f"bond {i} ({self.bonds[i]}) unmatched")
+
 
 	def _match_angles(self,atypes):
 		self.angles_th0 = np.empty(self.angles.shape[0],dtype=np.float32)
 		self.angles_cth = np.empty(self.angles.shape[0],dtype=np.float32)
 
 		for i in range(self.angles.shape[0]):
+			matched = False
 			for a in atypes:
 				t0 = self.atypes[self.angles[i,0]]
 				t1 = self.atypes[self.angles[i,1]]
 				t2 = self.atypes[self.angles[i,2]]
-				if (_match_type(t0,a[0]) and _match_type(t1,a[1]) and _match_type(t2,a[2])) or (_match_type(t0,a[2]) and _match_type(t1,a[1]) and _match_type(t2,a[0])):
+				if ((_match_type(t0,a[0]) and _match_type(t1,a[1]) and _match_type(t2,a[2]))
+						or (_match_type(t0,a[2]) and _match_type(t1,a[1]) and _match_type(t2,a[0]))):
 					self.angles_th0[i] = a[3] / 180. * np.pi
 					self.angles_cth[i] = a[4]
+					matched = True
 					break # first match only
+			if not matched:
+				self.angles_th[i] = np.nan
+				self.angles_cth[i] = np.nan
+				log.warn(f"angle {i} ({self.angles[i]}) unmatched")
+
 
 		self.angles_2rth0 = 2. * np.reciprocal(self.angles_th0)
 		
 
 
 	def _match_dihed(self,d4types,d9types):
-		# TODO
-		pass
+		self.dihed9_phase = np.empty(self.dihed9.shape[0],dtype=np.float32)
+		self.dihed9_kd = np.empty(self.dihed9.shape[0],dtype=np.float32)
+
+		# XXX: type4 are not matched to FF, they are always included if present in topology
+
+		for i in range(self.dihed9.shape[0]):
+			matched = False
+			for d in d9types:
+				t0 = self.atypes[self.dihed9[i,0]]
+				t1 = self.atypes[self.dihed9[i,1]]
+				t2 = self.atypes[self.dihed9[i,2]]
+				t3 = self.atypes[self.dihed9[i,3]]
+
+				if ((_match_type(t0,d[0]) and _match_type(t1,d[1]) and _match_type(t2,d[2]) and _match_type(t3,d[3])) 
+						or (_match_type(t0,d[3]) and _match_type(t1,d[2]) and _match_type(t2,d[1]) and _match_type(t3,d[0]))):
+					self.dihed9_phase[i] = d[4] / 180. * np.pi
+					self.dihed9_kd[i] = d[5]
+					matched = True
+					break
+			if not matched:
+				self.dihed9_phase[i] = np.nan
+				self.dihed9_kd[i] = np.nan
+				log.warn(f"dihed9 {i} ({self.dihed9[i]}) unmatched")
+
 
 
 # ....
@@ -173,6 +211,8 @@ class Molecule:
 
 
 
+# XXX: unmatched bonds/angles/dihedrals (i.e. nans in their properties) are not handled yet
+
 # geoms[atom][xyz][conf]
 	def _ic_bonds(self,geoms):
 		out = np.empty([self.bonds.shape[0],geoms.shape[2]],dtype=np.float32)
@@ -191,15 +231,64 @@ class Molecule:
 		for i in range(self.angles.shape[0]):
 			v1 = geoms[self.angles[i,0],:,:] - geoms[self.angles[i,1],:,:]
 			v2 = geoms[self.angles[i,2],:,:] - geoms[self.angles[i,1],:,:]
-			rn1 = np.reciprocal(np.linalg.norm(v1,axis=0))
-			rn2 = np.reciprocal(np.linalg.norm(v2,axis=0))
+			n1 = np.linalg.norm(v1,axis=0)
+			n2 = np.linalg.norm(v2,axis=0)
 			dot = np.einsum('ij,ij->j',v1,v2)
-			aa = np.arccos(dot * rn1 * rn2)
+			dot /= n1 * n2
+			aa = np.arccos(dot)
 			out[i] = (aa - .75 * self.angles_th0[i]) * self.angles_2rth0[i] # map 0.75 a0 -- 1.25 a0 to 0 -- 1
 
 		return out
 
-# TODO dihedrals 4/9, nbdistance
+
+	def _ic_dihedral(self,geoms,atoms):
+		a12 = geoms[atoms[1],:,:] - geoms[atoms[0],:,:]
+		a23 = geoms[atoms[2],:,:] - geoms[atoms[1],:,:]
+		a34 = geoms[atoms[3],:,:] - geoms[atoms[2],:,:]
+
+		a12 /= np.linalg.norm(a12,axis=0)
+		a23 /= np.linalg.norm(a23,axis=0)
+		a34 /= np.linalg.norm(a34,axis=0)
+
+		vp1 = np.cross(a12,a23,axis=0)
+		vp2 = np.cross(a23,a34,axis=0)
+		vp3 = np.cross(vp1,a23,axis=0)
+
+		sp1 = np.einsum('ij,ij->j',vp1,vp2)
+		sp2 = np.einsum('ij,ij->j',vp3,vp2)
+
+		""" original:
+
+		aa = np.arctan2(sp1,sp2) - np.pi * .5
+		return np.sin(aa), np.cos(aa)
+
+		this is the same, IMHO, without expensive trigon:""" 
+
+		return (1.-sp2)*.5, (1.+sp1)*.5
+
+
+	def _ic_dihed4(self,geoms):
+		out = np.empty([self.dihed4.shape[0] * 2, geoms.shape[2]],dtype=np.float32)
+
+		for i in range(self.dihed4.shape[0]):
+			s,c = self._ic_dihedral(geoms,self.dihed4[i])
+			out[2*i] = s
+			out[2*i+1] = c
+
+		return out
+
+
+	def _ic_dihed9(self,geoms):
+		out = np.empty([self.dihed9.shape[0] * 2, geoms.shape[2]],dtype=np.float32)
+
+		for i in range(self.dihed9.shape[0]):
+			s,c = self._ic_dihedral(geoms,self.dihed9[i])
+			out[2*i] = s
+			out[2*i+1] = c
+
+		return out
+
+# TODO nbdistance
 
 	def intcoord(self,geoms):
 		if self.nb is not None:
@@ -210,6 +299,8 @@ class Molecule:
 		return np.concatenate((
 			self._ic_bonds(geoms),
 			self._ic_angles(geoms),
+			self._ic_dihed4(geoms),
+			self._ic_dihed9(geoms),
 			nb
 			),axis=0)
 
@@ -228,7 +319,9 @@ if __name__ == '__main__':
 	print(mol.dihed9)
 
 
-	print(_parse_ff(os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp'))
+	ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp'
+	btypes,atypes,d4types,d9types = _parse_ff(ff)
+	print(d9types)
 
 	print(mol.bonds_b0)
 	print(mol.angles_th0)
