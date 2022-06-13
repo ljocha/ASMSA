@@ -25,4 +25,4 @@ RUN apt-get install -y inotify-tools
 RUN apt-get install -y rsync
 COPY monitor.sh /tmp
 
-ENTRYPOINT []
+ENTRYPOINT ["/tmp/monitor.sh", "&"]
