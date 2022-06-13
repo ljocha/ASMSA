@@ -1,6 +1,7 @@
 #!/bin/bash
-
+export ABCDE="hehe"
 set -e
+export ABCD="hehe"
 
 /bin/bash -c "./monitor.sh" & disown
 
