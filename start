@@ -1,1 +1,2 @@
+#!/bin/bash
 /bin/bash -c "./monitor.sh" & disown
