@@ -21,5 +21,8 @@ RUN chown -R 1000:1000 /home/jovyan
 RUN apt install -y krb5-user sshfs
 COPY krb5.conf /etc
 
-ENTRYPOINT []
+RUN apt-get install -y inotify-tools
+RUN apt-get install -y rsync
+COPY monitor.sh /tmp
 
+ENTRYPOINT ["/tmp/monitor.sh", "&"]
