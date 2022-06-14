@@ -2,8 +2,18 @@
 
 set -e
 
-./monitor.sh &
+# ./monitor.sh &
 
-# /usr/bin/python /usr/local/bin/jupyterhub-singleuser --ip=0.0.0.0 --port=8888 --NotebookApp.base_url=${JUPYTERHUB_SERVICE_PREFIX} --NotebookApp.token=${JPY_API_TOKEN}
+pvc_path=$(df --output=target | grep home)
+
+rsync -avz ${pvc_path}/jovyan /home
+
+function pvc_sync_daemon {
+    while inotifywait -r -e modify,create,delete,move /home/jovyan; do
+        rsync -az --delete /home/jovyan $pvc_path
+    done
+}
+
+pvc_sync_daemon &
 
 exec "$@"
