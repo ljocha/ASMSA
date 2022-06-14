@@ -2,10 +2,8 @@
 
 set -e
 
-# ./monitor.sh &
 
 pvc_path=$(df --output=target | grep home)
-
 rsync -avz ${pvc_path}/jovyan /home
 
 function pvc_sync_daemon {
@@ -14,6 +12,6 @@ function pvc_sync_daemon {
     done
 }
 
-pvc_sync_daemon &
 
+pvc_sync_daemon &
 exec "$@"
