@@ -2,7 +2,7 @@
 
 set -e
 
-identificator=$JUPYTERHUB_SERVER_NAME
+identificator=$HOSTNAME
 pvc_path=$(df --output=target | grep home)
 persist_folder="${pvc_path}/${identificator}/"
 
