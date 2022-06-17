@@ -19,6 +19,6 @@ RUN apt-get update
 RUN apt install -y krb5-user sshfs
 COPY krb5.conf /etc
 
-RUN apt-get install -y inotify-tools rsync
+RUN apt-get install -y inotify-tools
 
 ENTRYPOINT ["./start.sh"]
