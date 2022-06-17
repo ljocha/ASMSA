@@ -15,10 +15,10 @@ COPY . /home/jovyan
 RUN useradd -m -u 1000 jovyan
 RUN chown -R 1000:1000 /home/jovyan
 
+RUN apt-get update
 RUN apt install -y krb5-user sshfs
 COPY krb5.conf /etc
 
-RUN apt-get update
 RUN apt-get install -y inotify-tools rsync
 
 ENTRYPOINT ["./start.sh"]
