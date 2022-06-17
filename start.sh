@@ -4,7 +4,7 @@ set -e
 
 identificator=$JUPYTERHUB_SERVER_NAME
 pvc_path=$(df --output=target | grep home)
-persist_folder=${pvc_path}/${identificator}
+persist_folder="${pvc_path}/${identificator}"
 rsync -avz $persist_folder /home
 
 function pvc_sync_daemon {
