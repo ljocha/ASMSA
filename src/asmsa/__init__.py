@@ -4,6 +4,24 @@ import re
 import os.path
 import logging
 
+from networkx.generators import chordal_cycle_graph
+from networkx.generators.classic import complete_graph
+import networkx as nx
+
+# TODO: replace by sympy.next_prime
+_max_prime = 10000
+_sieve = np.full(_max_prime+1, True)
+_sieve[0] = _sieve[1] = False
+for i in range(2, int(np.sqrt(_max_prime+1)) + 2):
+    if _sieve[i]:
+        _sieve[np.arange(2*i, _max_prime+1, i)] = False
+_primes = np.arange(0,_max_prime+1, 1)[_sieve]
+
+def next_prime(n):
+	assert(n <= _max_prime)
+	return int(_primes[np.searchsorted(_primes, n)])
+
+
 def _parse_top(top):
 	anums = []
 	types = []
@@ -102,9 +120,52 @@ def _match_type(atom,pattern):
 	return atom == pattern or (len(pattern) > 1 and atom[0] == pattern[0] and pattern[1] == '*') or pattern == 'X'
 
 
+class FeatureMap:
+	def ic(self, geoms):
+		return np.empty([0,geoms.shape[2]],dtype=np.float32)
+
+
+class NBDistancesSparse(FeatureMap):
+	def __init__(self, n_atoms, density=1):
+		p = next_prime(n_atoms)
+		assert(1 <= density < p)
+
+		edges = []
+
+		for i in range(1, density + 1):
+			G = chordal_cycle_graph(p)
+			G.remove_edges_from(nx.selfloop_edges(G))
+
+			edges += [((a*i) % p, (b*i) % p) for a,b in G.edges()]
+
+		E = np.array(list(set(
+            [tuple(sorted([min(a, n_atoms-1),min(b, n_atoms-1)])) for a,b in edges]
+        )))
+
+		self.edges_s = np.array(E)[:, 0]
+		self.edges_t = np.array(E)[:, 1]
+
+	def ic(self, geoms):
+		dist_vecs = geoms[self.edges_s] - geoms[self.edges_t]
+		return np.linalg.norm(dist_vecs, axis=1)
+
+
+class NBDistancesDense(FeatureMap):
+	def __init__(self, n_atoms):
+		G = complete_graph(n_atoms)
+
+		E = np.array([e for e in G.edges()])
+		self.edges_s = E[:, 0]
+		self.edges_t = E[:, 1]
+
+	def ic(self,geoms):
+		dist_vecs = geoms[self.edges_s] - geoms[self.edges_t]
+		return np.linalg.norm(dist_vecs, axis=1)
+
+
 class Molecule:
 
-	def __init__(self,pdb,top,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp'):
+	def __init__(self,pdb,top,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',fms=[]):
 		self.ref = md.load_pdb(pdb)
 		self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top)
 		btypes,atypes,d4types,d9types = _parse_ff(ff)
@@ -112,6 +173,7 @@ class Molecule:
 		self._match_angles(atypes)
 		self._match_dihed(d4types,d9types)
 		self.nb = None
+		self.fms = fms
 
 	def _match_bonds(self,btypes):
 		self.bonds_b0 = np.empty(self.bonds.shape[0],dtype=np.float32)
@@ -124,10 +186,10 @@ class Molecule:
 				t1 = self.atypes[self.bonds[i,1]]
 				if ((_match_type(t0,b[0]) and _match_type(t1,b[1]))
 						or (_match_type(t0,b[1]) and _match_type(t1,b[0]))):
-					 self.bonds_b0[i] = b[2]
-					 self.bonds_kb[i] = b[3]
-					 matched = True
-					 break	# first match only
+					self.bonds_b0[i] = b[2]
+					self.bonds_kb[i] = b[3]
+					matched = True
+					break	# first match only
 			if not matched:
 				self.bonds_b0[i] = np.nan
 				self.bonds_kb[i] = np.nan
@@ -288,21 +350,16 @@ class Molecule:
 
 		return out
 
+
 # TODO nbdistance
 
 	def intcoord(self,geoms):
-		if self.nb is not None:
-			nb = self.nb.ic(geoms)
-		else:
-			nb = np.empty([0,geoms.shape[2]],dtype=np.float32)
-			
-		return np.concatenate((
+		return np.concatenate([
 			self._ic_bonds(geoms),
 			self._ic_angles(geoms),
 			self._ic_dihed4(geoms),
 			self._ic_dihed9(geoms),
-			nb
-			),axis=0)
+			] + [fm.ic(geoms) for fm in self.fms],axis=0)
 
 
 logging.basicConfig(format='%(message)s')
