@@ -1,14 +1,27 @@
+from tensorflow.keras.optimizers import Adam
+
 from keras.layers import Input, Dense, Reshape, Flatten
 from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Sequential, Model
 from keras import backend as kb
 import keras as krs
+import numpy as np
+import logging
 
+
+logging.root.handlers = []
+logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.INFO,
+                    handlers=[
+                        logging.FileHandler("gan.log", mode="w"),
+                        logging.StreamHandler()
+                    ])
 
 
 class GAN():
-    def __init__(self, x_train, out_file):
+    def __init__(self, x_train, out_file = 'lows.txt'):
         self.X_train = x_train
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
@@ -97,4 +110,4 @@ class GAN():
                       f"[AE loss: {ae_loss}] [C loss: {c_loss}]"
                 logging.info(output)
         newlows = self.encoder(self.X_train)
-        np.savetxt(out_file, newlows)
+        np.savetxt(self.out_file, newlows)
