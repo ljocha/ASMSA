@@ -28,7 +28,6 @@ class GAN():
         validity = self.discriminator(low)
         self.combined = Model(mol_inp, validity)
         self.combined.compile(loss='mean_squared_error', optimizer=optimizer)
-        
 
         
     def build_encoder(self):
@@ -75,42 +74,7 @@ class GAN():
         validity = model(mol)
         return Model(mol, validity)
 
-        
-    def sample_state(self, epoch):
-        x = np.random.normal(0, 1, (1, self.latent_dim))
-        mol = self.decoder.predict(x)
-        phi = np.arccos(2.0*mol[0,72]-1.0)
-        if (2.0*mol[0,73]-1.0) < 0.0:
-            phi = -phi
-        psi = np.arccos(2.0*mol[0,102]-1.0)
-        if (2.0*mol[0,103]-1.0) < 0.0:
-            psi = -psi
-        pot = forcefield(mol[0])
-        logging.info(pot)
-        for i in range(10000):
-            newx = x + np.random.normal(0, 0.5, (1, self.latent_dim))
-            newmol = self.decoder.predict(newx)
-            newphi = np.arccos(2.0*newmol[0,72]-1.0)
-            if (2.0*newmol[0,73]-1.0) < 0.0:
-                newphi = -newphi
-            newpsi = np.arccos(2.0*newmol[0,102]-1.0)
-            if (2.0*newmol[0,103]-1.0) < 0.0:
-                newpsi = -newpsi
-            newpot = forcefield(newmol[0])
-            metro = np.exp((pot-newpot)/8.314/0.3)
-            if newpot < pot:
-                x = newx
-                pot = newpot
-                phi = newphi
-                psi = newpsi
-            elif np.random.rand(1) < metro:
-                x = newx
-                pot = newpot
-                phi = newphi
-                psi = newpsi
-            logging.info(f"{i+1}, {pot}, {metro}, {phi}, {psi}")
 
-            
     def train(self, epochs, batch_size=128): 
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
@@ -133,4 +97,4 @@ class GAN():
                       f"[AE loss: {ae_loss}] [C loss: {c_loss}]"
                 logging.info(output)
         newlows = self.encoder(self.X_train)
-        np.savetxt("lows.txt", newlows)
+        np.savetxt(out_file, newlows)
