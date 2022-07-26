@@ -178,11 +178,11 @@ class GAN():
                       f"[AE loss: {ae_loss}] [C loss: {c_loss}]"
                 logging.info(output)
             
-            if epoch % visualize_freq == 0 and epoch != 0:
+            if epoch % visualize_freq == 0:
                 tmplows = self.encoder(self.X_train)
                 np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
-                display.display(plt.gcf())
                 self._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
+                plt.pause(0.01)
         
         newlows = self.encoder(self.X_train)
         np.savetxt(self.out_file, newlows)
