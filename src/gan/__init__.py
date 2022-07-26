@@ -5,9 +5,13 @@ from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Sequential, Model
 from keras import backend as kb
+from scipy.stats import gaussian_kde
+from IPython import display
+import matplotlib.pyplot as plt
 import keras as krs
 import numpy as np
 import logging
+import os
 
 
 logging.root.handlers = []
@@ -41,7 +45,71 @@ class GAN():
         validity = self.discriminator(low)
         self.combined = Model(mol_inp, validity)
         self.combined.compile(loss='mean_squared_error', optimizer=optimizer)
+        
+        
+    def _make_visualization(self, output_file=None):
+        if output_file is None:
+            output_file = self.output_file
+        
+        os.chdir('/home/jovyan/visualization')
+        lows = np.loadtxt(output_file)
 
+        rama_ala = np.loadtxt('rama_ala_reduced.txt', usecols=(0,1))
+        angever1 = np.loadtxt('angever1.txt')
+        angever2 = np.loadtxt('angever2.txt')
+        angever3 = np.loadtxt('angever3.txt')
+
+
+        cvs = (lows[:, 0], lows[:, 1])
+        analysis_files = {
+            'rama0' : rama_ala[:, 0],
+            'rama1' : rama_ala[:, 1],
+            'ang1' : angever1[:, 1],
+            'ang2' : angever2[:, 1],
+            'ang3' : angever3[:, 1]
+        }
+
+        # set limits
+        xmin, xmax = min(cvs[0]), max(cvs[0])
+        ymin, ymax = min(cvs[1]), max(cvs[1])
+
+        # plot configuration
+        plt.suptitle('Low Dimentional Space - Analysis')
+        plt.style.use("seaborn-white")
+        fig = plt.figure(figsize=(18, 10))
+        fig.supxlabel('CV1', x=0.5, fontsize=16, fontweight='bold')
+        fig.supylabel('CV2', x=0.1, fontsize=16, fontweight='bold')
+
+        # plot first graph
+        X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        pos = np.empty(X.shape + (2,))
+        pos[:, :, 0] = X; pos[:, :, 1] = Y
+        values = np.vstack([cvs[0], cvs[1]])
+        kernel = gaussian_kde(values)
+        dens = np.reshape(kernel(positions).T, X.shape)
+        ax1 = plt.subplot(2, 3, 1)
+        ax1.set_xticks([])
+        plt.imshow(np.rot90(dens), cmap="hsv", aspect="auto", extent=[xmin, xmax, ymin, ymax])
+
+
+        # plot every other graph
+        i = 2
+        for name, data in analysis_files.items():
+            ax = plt.subplot(2, 3, i)
+            ax.set_xlim([xmin, xmax])
+            ax.set_ylim([ymin, ymax])
+            ax.set_title(name)
+            if i in [2,3,5,6]:
+                ax.set_yticks([])
+            if i in [2,3]:
+                ax.set_xticks([])
+            plt.scatter(cvs[0], cvs[1], s=1, c=data, cmap="hsv")
+            i += 1
+
+        plt.savefig('analysis_tmp.png')
+        os.chdir('/home/jovyan')
+        
         
     def build_encoder(self):
         model = Sequential()
@@ -88,7 +156,7 @@ class GAN():
         return Model(mol, validity)
 
 
-    def train(self, epochs, batch_size=128): 
+    def train(self, epochs, batch_size=128, visualize_freq=200): 
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
 
@@ -109,5 +177,15 @@ class GAN():
                 output = f"{epoch} [D loss: {d_loss[0]},acc.: {100*d_loss[1]}]" + \
                       f"[AE loss: {ae_loss}] [C loss: {c_loss}]"
                 logging.info(output)
+            
+            if epoch % visualize_freq == 0 and epoch != 0:
+                tmplows = self.encoder(self.X_train)
+                print(tmplows)
+                np.savetxt('/home/jovyan/visualization/tmplows.txt', tmplows)
+                display.display(plt.gcf())
+                self._make_visualization('/home/jovyan/visualization/tmplows.txt')
+        
         newlows = self.encoder(self.X_train)
         np.savetxt(self.out_file, newlows)
+
+        
