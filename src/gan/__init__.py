@@ -51,7 +51,7 @@ class GAN():
         if output_file is None:
             output_file = self.output_file
         
-        os.chdir('/home/jovyan/visualization')
+        os.chdir(os.path.expanduser("~/visualization"))
         lows = np.loadtxt(output_file)
 
         rama_ala = np.loadtxt('rama_ala_reduced.txt', usecols=(0,1))
@@ -108,7 +108,7 @@ class GAN():
             i += 1
 
         plt.savefig('analysis_tmp.png')
-        os.chdir('/home/jovyan')
+        os.chdir(os.path.expanduser("~"))
         
         
     def build_encoder(self):
@@ -180,10 +180,9 @@ class GAN():
             
             if epoch % visualize_freq == 0 and epoch != 0:
                 tmplows = self.encoder(self.X_train)
-                print(tmplows)
-                np.savetxt('/home/jovyan/visualization/tmplows.txt', tmplows)
+                np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
                 display.display(plt.gcf())
-                self._make_visualization('/home/jovyan/visualization/tmplows.txt')
+                self._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
         
         newlows = self.encoder(self.X_train)
         np.savetxt(self.out_file, newlows)
