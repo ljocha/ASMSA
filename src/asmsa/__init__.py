@@ -218,7 +218,7 @@ class Molecule:
 					matched = True
 					break # first match only
 			if not matched:
-				self.angles_th[i] = np.nan
+				self.angles_th0[i] = np.nan
 				self.angles_cth[i] = np.nan
 				log.warn(f"angle {i} ({self.angles[i]}) unmatched")
 
