@@ -197,15 +197,21 @@ class GAN():
         return Model(mol, lowdim)
     
     
-    def _build_decoder(self):
+    def _build_decoder(self, params=[("sigmoid", 8),
+                                     ("sigmoid", 16),
+                                     ("sigmoid", 32)],
+                                     ("linear", None)):
         model = Sequential()
-        model.add(Dense(1024, input_dim=self.latent_dim, activation='relu'))
+        # input layer
+        model.add(Dense(params[0][1], input_dim=self.latent_dim, activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512, activation='relu'))
+        # hidden layers
+        model.add(Dense(params[1][1], activation=params[1][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512, activation='relu'))
+        model.add(Dense(params[2][1], activation=params[2][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(np.prod(self.mol_shape), activation='sigmoid'))
+        # output layer
+        model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
         model.summary(print_fn=logging.info)
         lowdim = Input(shape=(self.latent_dim,))
