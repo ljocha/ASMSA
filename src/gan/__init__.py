@@ -108,6 +108,10 @@ class GAN():
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
 
+        self._compile()
+        
+        
+    def _compile(self):
         self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
         self.aae.compile()
 
@@ -246,10 +250,14 @@ class GAN():
             # e.g [1,2,3,4] -> [3,2,1,4]
             reversed_params = params[:-1][::-1] + params[-1:]
             self.set_decoder(reversed_params)
+    
+        self._compile()
+        
         
     def set_decoder(self, params):
         model = self._build_decoder(params)
         self.decoder = model
+        self._compile()
         
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
