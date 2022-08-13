@@ -237,18 +237,18 @@ class GAN():
         return Model(mol, validity)
     
     
-    def set_encoder(self, params, inverse_decoder=False):
-        model = _build_encoder(params)
+    def set_encoder(self, params, build_decoder=False):
+        model = self._build_encoder(params)
         self.encoder = model
         
-        if inverse_decoder:
+        if build_decoder:
             # reverse parameters (output layer of decoder is the same as encoders')
             # e.g [1,2,3,4] -> [3,2,1,4]
             reversed_params = params[:-1][::-1] + params[-1:]
-            set_decoder(reversed_params)
+            self.set_decoder(reversed_params)
         
     def set_decoder(self, params):
-        model = _build_decoder(params)
+        model = self._build_decoder(params)
         self.decoder = model
         
 
