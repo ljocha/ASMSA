@@ -166,13 +166,18 @@ class NBDistancesDense(FeatureMap):
 class Molecule:
 
 	def __init__(self,pdb,top,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',fms=[]):
-		self.ref = md.load_pdb(pdb)
-		self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top)
-		btypes,atypes,d4types,d9types = _parse_ff(ff)
-		self._match_bonds(btypes)
-		self._match_angles(atypes)
-		self._match_dihed(d4types,d9types)
-		self.nb = None
+		# XXX: unused self.ref = md.load_pdb(pdb)
+
+		if not top and not fms:
+			raise ValueError("At least one of `top` or `fms` must be provided")
+
+		if top:
+			self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top)
+			btypes,atypes,d4types,d9types = _parse_ff(ff)
+			self._match_bonds(btypes)
+			self._match_angles(atypes)
+			self._match_dihed(d4types,d9types)
+
 		self.fms = fms
 
 	def _match_bonds(self,btypes):
@@ -213,7 +218,7 @@ class Molecule:
 					matched = True
 					break # first match only
 			if not matched:
-				self.angles_th[i] = np.nan
+				self.angles_th0[i] = np.nan
 				self.angles_cth[i] = np.nan
 				log.warn(f"angle {i} ({self.angles[i]}) unmatched")
 
@@ -354,6 +359,15 @@ class Molecule:
 # TODO nbdistance
 
 	def intcoord(self,geoms):
+		if not hasattr(self,'atypes'):
+			return np.concatenate([fm.ic(geoms) for fm in self.fms],axis=0)
+
+		if geoms.shape[0] != len(self.atypes):
+			raise ValueError(f"Number of atoms ({geoms.shape[0]}) does not match topology ({len(self.atypes)})")
+
+		if geoms.shape[1] != 3:
+			raise ValueError(f"3D coordinates expected, {geoms.shape[1]} given")
+
 		return np.concatenate([
 			self._ic_bonds(geoms),
 			self._ic_angles(geoms),
