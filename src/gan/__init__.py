@@ -223,18 +223,21 @@ class GAN():
         return Model(lowdim, mol)
 
     
-    def _build_discriminator(self):
+    def _build_discriminator(self, params=[(None, 512),
+                                           (None, 256),
+                                           (None, 256),
+                                           (None, 1)]):
         model = Sequential()
         model.add(Flatten(input_shape=(self.latent_dim,)))
-        model.add(Dense(512))
+        model.add(Dense(params[0][1]))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(256))
+        model.add(Dense(params[1][1]))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(256))
+        model.add(Dense(params[2][1]))
         model.add(LeakyReLU(alpha=0.2))
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
-        model.add(Dense(1))
+        model.add(Dense(params[3][1]))
         model.summary(print_fn=logging.info)
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
@@ -250,13 +253,18 @@ class GAN():
             # e.g [1,2,3,4] -> [3,2,1,4]
             reversed_params = params[:-1][::-1] + params[-1:]
             self.set_decoder(reversed_params)
-    
         self._compile()
         
         
     def set_decoder(self, params):
         model = self._build_decoder(params)
         self.decoder = model
+        self._compile()
+        
+        
+    def set_discriminator(self, params):
+        model = self._build_discriminator(params)
+        self.discriminator = model
         self._compile()
         
 
