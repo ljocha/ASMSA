@@ -178,8 +178,8 @@ class GAN():
         
     def _build_encoder(self, params=[("sigmoid", 32),
                                      ("sigmoid", 16),
-                                     ("sigmoid", 8)],
-                                     ("linear", None)):
+                                     ("sigmoid", 8),
+                                     ("linear", None)]):
         model = Sequential()
         # input layer
         model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
@@ -187,10 +187,10 @@ class GAN():
         # hidden layers
         model.add(Dense(params[1][1], activation=params[1][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(params[2][1], activation=[2][0]))
+        model.add(Dense(params[2][1], activation=params[2][0]))
         model.add(BatchNormalization(momentum=0.8))
         #output layer
-        model.add(Dense(self.latent_dim, activation=activation=params[3][0]))
+        model.add(Dense(self.latent_dim, activation=params[3][0]))
         model.summary(print_fn=logging.info)
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
@@ -199,8 +199,8 @@ class GAN():
     
     def _build_decoder(self, params=[("sigmoid", 8),
                                      ("sigmoid", 16),
-                                     ("sigmoid", 32)],
-                                     ("linear", None)):
+                                     ("sigmoid", 32),
+                                     ("linear", None)]):
         model = Sequential()
         # input layer
         model.add(Dense(params[0][1], input_dim=self.latent_dim, activation=params[0][0]))
