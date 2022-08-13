@@ -237,7 +237,15 @@ class GAN():
         return Model(mol, validity)
     
     
-#     def set_encoder(self, )
+    def set_encoder(self, params):
+        model = _build_encoder(params)
+        self.encoder = model
+            
+        
+    def set_decoder(self, params):
+        model = _build_decoder(params)
+        self.decoder = model
+        
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
         def __init__(self,parent,freq):
