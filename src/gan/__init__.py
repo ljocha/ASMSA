@@ -1,3 +1,4 @@
+import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 from keras.layers import Input, Dense, Reshape, Flatten
@@ -8,7 +9,6 @@ from keras import backend as kb
 from scipy.stats import gaussian_kde
 from IPython import display
 import matplotlib.pyplot as plt
-import keras as krs
 import numpy as np
 import logging
 import os
@@ -23,6 +23,80 @@ logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
                         logging.StreamHandler()
                     ])
 
+def _normal_prior(shape):
+	return tf.random.normal(shape=shape)
+
+class AAEModel(Model):
+	def __init__(self,enc,dec,disc,lowdim,prior = _normal_prior):
+		super().__init__()
+		self.enc = enc
+		self.dec = dec
+		self.disc = disc
+		self.lowdim = lowdim
+		self.prior = prior
+
+
+	def compile(self,
+		opt = Adam(0.0002,0.5),	# FIXME: justify
+		ae_loss_fn = tf.keras.losses.MeanSquaredError(),
+# XXX: logits as in https://keras.io/guides/customizing_what_happens_in_fit/, 
+# hope it works as the discriminator output is never used directly
+		disc_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)	
+	):
+
+		super().compile()
+		self.opt = opt
+		self.ae_loss_fn = ae_loss_fn
+		self.disc_loss_fn = disc_loss_fn
+
+	def train_step(self,batch):
+		if isinstance(batch,tuple):
+			batch = batch[0]
+
+		batch_size = tf.shape(batch)[0]
+
+
+# improve AE to reconstruct
+		with tf.GradientTape(persistent=True) as ae_tape:
+			reconstruct = self.dec(self.enc(batch))
+			ae_loss = self.ae_loss_fn(batch,reconstruct)
+
+		enc_grads = ae_tape.gradient(ae_loss, self.enc.trainable_weights)
+		self.opt.apply_gradients(zip(enc_grads,self.enc.trainable_weights))
+
+		dec_grads = ae_tape.gradient(ae_loss, self.dec.trainable_weights)
+		self.opt.apply_gradients(zip(dec_grads,self.dec.trainable_weights))
+
+# improve discriminator
+		rand_low = self.prior((batch_size,self.lowdim))
+		better_low = self.enc(batch)
+		low = tf.concat([rand_low,better_low],axis=0)
+
+		labels = tf.concat([tf.ones((batch_size,1)), tf.zeros((batch_size,1))], axis=0)
+		labels += 0.05 * tf.random.uniform(tf.shape(labels))	# guide
+
+		with tf.GradientTape() as disc_tape:
+			pred = self.disc(low)
+			disc_loss = self.disc_loss_fn(labels,pred)
+
+		disc_grads = disc_tape.gradient(disc_loss,self.disc.trainable_weights)
+		self.opt.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
+
+# teach encoder to cheat
+		alltrue = tf.ones((batch_size,1))
+
+		with tf.GradientTape() as cheat_tape:
+			cheat = self.disc(self.enc(batch))
+			cheat_loss = self.disc_loss_fn(alltrue,cheat)
+
+		cheat_grads = cheat_tape.gradient(cheat_loss,self.enc.trainable_weights)
+		self.opt.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
+
+		return { 'ae_loss' : ae_loss, 'd_loss' : disc_loss }
+
+		
+		
+
 
 class GAN():
     def __init__(self, x_train, out_file = 'lows.txt'):
@@ -30,22 +104,13 @@ class GAN():
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
-        optimizer = Adam(0.0002, 0.5)
         self.discriminator = self.build_discriminator()
-        self.discriminator.compile(loss='binary_crossentropy',
-                                   optimizer=optimizer,
-                                   metrics=['accuracy'])
         self.encoder = self.build_encoder()
         self.decoder = self.build_decoder()
-        mol_inp = Input(shape=self.mol_shape)
-        low = self.encoder(mol_inp)
-        mol_out = self.decoder(low)
-        self.autoencoder = Model(mol_inp, mol_out)
-        self.autoencoder.compile(loss='mean_squared_error', optimizer=optimizer)
-        validity = self.discriminator(low)
-        self.combined = Model(mol_inp, validity)
-        self.combined.compile(loss='mean_squared_error', optimizer=optimizer)
-        
+
+        self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
+        self.aae.compile()
+
         
     def _make_visualization(self, output_file=None):
         if output_file is None:
@@ -149,42 +214,38 @@ class GAN():
         model.add(LeakyReLU(alpha=0.2))
         model.add(Dense(256))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(1, activation='sigmoid'))
+# changed to match logit use in AAE.train_step()
+#        model.add(Dense(1, activation='sigmoid'))
+        model.add(Dense(1))
         model.summary(print_fn=logging.info)
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
         return Model(mol, validity)
 
+    class VisualizeCallback(tf.keras.callbacks.Callback):
+        def __init__(self,parent,freq):
+            super().__init__()
+            self.parent = parent
+            self.freq = freq
+
+        def on_epoch_begin(self,epoch,logs=None):
+            if epoch % self.freq == 0:
+                tmplows = self.parent.encoder(self.parent.X_train)
+                np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
+                self.parent._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
+                plt.pause(0.01)
+				    
 
     def train(self, epochs, batch_size=128, visualize_freq=False): 
-        valid = np.ones((batch_size, 1))
-        fake = np.zeros((batch_size, 1))
 
-        for epoch in range(epochs):
-            idx = np.random.randint(0, self.X_train.shape[0], batch_size)
-            mols = self.X_train[idx]
-            gen_lows = self.encoder.predict(mols)
-            gen_mols = self.decoder.predict(gen_lows)
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-            idx = np.random.randint(0, self.X_train.shape[0], batch_size)
-            mols = self.X_train[idx]
-            ae_loss = self.autoencoder.train_on_batch(mols, mols)
-            c_loss = self.combined.train_on_batch(mols, valid)
-            d_loss_real = self.discriminator.train_on_batch(noise, valid)
-            d_loss_fake = self.discriminator.train_on_batch(gen_lows, fake)
-            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
-            if epoch % 100 == 0:
-                output = f"{epoch} [D loss: {d_loss[0]},acc.: {100*d_loss[1]}]" + \
-                      f"[AE loss: {ae_loss}] [C loss: {c_loss}]"
-                logging.info(output)
-            
-            if visualize_freq and epoch % visualize_freq == 0:
-                tmplows = self.encoder(self.X_train)
-                np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
-                self._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
-                plt.pause(0.01)
-        
+        dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
+        dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
+
+        callbacks = None
+        if visualize_freq:
+            callbacks = [GAN.VisualizeCallback(self,visualize_freq)]
+
+        self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
+
         newlows = self.encoder(self.X_train)
         np.savetxt(self.out_file, newlows)
-
-        
