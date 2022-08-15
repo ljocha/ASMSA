@@ -21,6 +21,5 @@ COPY krb5.conf /etc
 
 RUN apt-get install -y inotify-tools
 
-RUN jupyter serverextension enable --sys-prefix jupyter_server_proxy
 
 ENTRYPOINT ["./start.sh"]
