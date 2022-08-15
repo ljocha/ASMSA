@@ -6,7 +6,7 @@ ENV TZ=Europe/Prague
 RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
-RUN pip3 install jupyterhub mdtraj matplotlib jupyter-server-proxy
+RUN pip3 install jupyterhub mdtraj matplotlib
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
