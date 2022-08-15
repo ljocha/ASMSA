@@ -6,7 +6,7 @@ ENV TZ=Europe/Prague
 RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
-RUN pip3 install jupyterhub mdtraj matplotlib
+RUN pip3 install jupyterhub mdtraj matplotlib jupyter-server-proxy
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
@@ -20,5 +20,7 @@ RUN apt install -y krb5-user sshfs
 COPY krb5.conf /etc
 
 RUN apt-get install -y inotify-tools
+
+RUN jupyter serverextension enable --sys-prefix jupyter_server_proxy
 
 ENTRYPOINT ["./start.sh"]
