@@ -4,24 +4,16 @@ from tensorflow.keras.optimizers import Adam
 from keras.layers import Input, Dense, Reshape, Flatten
 from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
+from keras.callbacks import CSVLogger
 from keras.models import Sequential, Model
 from keras import backend as kb
 from scipy.stats import gaussian_kde
 from IPython import display
 import matplotlib.pyplot as plt
 import numpy as np
-import logging
 import os
 
 
-logging.root.handlers = []
-logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.INFO,
-                    handlers=[
-                        logging.FileHandler("gan.log", mode="w"),
-                        logging.StreamHandler()
-                    ])
 
 def _normal_prior(shape):
 	return tf.random.normal(shape=shape)
@@ -195,7 +187,6 @@ class GAN():
         model.add(BatchNormalization(momentum=0.8))
         #output layer
         model.add(Dense(self.latent_dim, activation=params[3][0]))
-        model.summary(print_fn=logging.info)
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
         return Model(mol, lowdim)
@@ -217,7 +208,6 @@ class GAN():
         # output layer
         model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
-        model.summary(print_fn=logging.info)
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
         return Model(lowdim, mol)
@@ -238,7 +228,6 @@ class GAN():
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
-        model.summary(print_fn=logging.info)
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
         return Model(mol, validity)
@@ -287,9 +276,13 @@ class GAN():
         dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
         dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
 
+        logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
+        csv_logger = CSVLogger(logdir + 'log.csv', append=False, separator=';')
+
         callbacks = None
         if visualize_freq:
-            callbacks = [GAN.VisualizeCallback(self,visualize_freq)]
+            callbacks = [GAN.VisualizeCallback(self,visualize_freq), csv_logger, tensorboard_callback]
 
         self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
 
