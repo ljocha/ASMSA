@@ -6,7 +6,7 @@ ENV TZ=Europe/Prague
 RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
-RUN pip3 install jupyterhub mdtraj matplotlib
+RUN pip3 install jupyterhub mdtraj matplotlib pydot pydotplus
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
@@ -19,7 +19,7 @@ RUN apt-get update
 RUN apt install -y krb5-user sshfs
 COPY krb5.conf /etc
 
-RUN apt-get install -y inotify-tools
+RUN apt-get install -y inotify-tools graphviz
 
 
 ENTRYPOINT ["./start.sh"]
