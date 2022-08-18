@@ -21,4 +21,5 @@ COPY krb5.conf /etc
 
 RUN apt-get install -y inotify-tools
 
+
 ENTRYPOINT ["./start.sh"]

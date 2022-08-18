@@ -4,24 +4,17 @@ from tensorflow.keras.optimizers import Adam
 from keras.layers import Input, Dense, Reshape, Flatten
 from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
+from keras.callbacks import CSVLogger
 from keras.models import Sequential, Model
 from keras import backend as kb
 from scipy.stats import gaussian_kde
 from IPython import display
 import matplotlib.pyplot as plt
 import numpy as np
-import logging
+import datetime
 import os
 
 
-logging.root.handlers = []
-logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.INFO,
-                    handlers=[
-                        logging.FileHandler("gan.log", mode="w"),
-                        logging.StreamHandler()
-                    ])
 
 def _normal_prior(shape):
 	return tf.random.normal(shape=shape)
@@ -104,10 +97,14 @@ class GAN():
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
-        self.discriminator = self.build_discriminator()
-        self.encoder = self.build_encoder()
-        self.decoder = self.build_decoder()
+        self.discriminator = self._build_discriminator()
+        self.encoder = self._build_encoder()
+        self.decoder = self._build_decoder()
 
+        self._compile()
+        
+        
+    def _compile(self):
         self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
         self.aae.compile()
 
@@ -176,51 +173,90 @@ class GAN():
         os.chdir(os.path.expanduser("~"))
         
         
-    def build_encoder(self):
+    def _build_encoder(self, params=[("sigmoid", 32),
+                                     ("sigmoid", 16),
+                                     ("sigmoid", 8),
+                                     ("linear", None)]):
         model = Sequential()
-        model.add(Dense(256, input_dim=np.prod(self.mol_shape), activation="sigmoid"))
+        # input layer
+        model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512, activation='relu'))
+        # hidden layers
+        model.add(Dense(params[1][1], activation=params[1][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(self.latent_dim, activation='linear'))
-        model.summary(print_fn=logging.info)
+        model.add(Dense(params[2][1], activation=params[2][0]))
+        model.add(BatchNormalization(momentum=0.8))
+        #output layer
+        model.add(Dense(self.latent_dim, activation=params[3][0]))
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
         return Model(mol, lowdim)
-
     
-    def build_decoder(self):
+    
+    def _build_decoder(self, params=[("sigmoid", 8),
+                                     ("sigmoid", 16),
+                                     ("sigmoid", 32),
+                                     ("linear", None)]):
         model = Sequential()
-        model.add(Dense(1024, input_dim=self.latent_dim, activation='relu'))
+        # input layer
+        model.add(Dense(params[0][1], input_dim=self.latent_dim, activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512, activation='relu'))
+        # hidden layers
+        model.add(Dense(params[1][1], activation=params[1][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512, activation='relu'))
+        model.add(Dense(params[2][1], activation=params[2][0]))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(np.prod(self.mol_shape), activation='sigmoid'))
+        # output layer
+        model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
-        model.summary(print_fn=logging.info)
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
         return Model(lowdim, mol)
 
     
-    def build_discriminator(self):
+    def _build_discriminator(self, params=[(None, 512),
+                                           (None, 256),
+                                           (None, 256),
+                                           (None, 1)]):
         model = Sequential()
         model.add(Flatten(input_shape=(self.latent_dim,)))
-        model.add(Dense(512))
+        model.add(Dense(params[0][1]))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(256))
+        model.add(Dense(params[1][1]))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(256))
+        model.add(Dense(params[2][1]))
         model.add(LeakyReLU(alpha=0.2))
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
-        model.add(Dense(1))
-        model.summary(print_fn=logging.info)
+        model.add(Dense(params[3][1]))
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
         return Model(mol, validity)
+    
+    
+    def set_encoder(self, params, build_decoder=False):
+        model = self._build_encoder(params)
+        self.encoder = model
+        
+        if build_decoder:
+            # reverse parameters (output layer of decoder is the same as encoders')
+            # e.g [1,2,3,4] -> [3,2,1,4]
+            reversed_params = params[:-1][::-1] + params[-1:]
+            self.set_decoder(reversed_params)
+        self._compile()
+        
+        
+    def set_decoder(self, params):
+        model = self._build_decoder(params)
+        self.decoder = model
+        self._compile()
+        
+        
+    def set_discriminator(self, params):
+        model = self._build_discriminator(params)
+        self.discriminator = model
+        self._compile()
+        
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
         def __init__(self,parent,freq):
@@ -241,9 +277,13 @@ class GAN():
         dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
         dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
 
+        logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
+        csv_logger = CSVLogger(logdir + 'log.csv', append=False, separator=';')
+
         callbacks = None
         if visualize_freq:
-            callbacks = [GAN.VisualizeCallback(self,visualize_freq)]
+            callbacks = [GAN.VisualizeCallback(self,visualize_freq), csv_logger, tensorboard_callback]
 
         self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
 
