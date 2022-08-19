@@ -178,6 +178,7 @@ class GAN():
                                      ("sigmoid", 8),
                                      ("linear", None)]):
         model = Sequential()
+        model._name = "Encoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -188,6 +189,7 @@ class GAN():
         model.add(BatchNormalization(momentum=0.8))
         #output layer
         model.add(Dense(self.latent_dim, activation=params[3][0]))
+        print(model.summary())
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
         return Model(mol, lowdim)
@@ -198,6 +200,7 @@ class GAN():
                                      ("sigmoid", 32),
                                      ("linear", None)]):
         model = Sequential()
+        model._name = "Decoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=self.latent_dim, activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -209,6 +212,7 @@ class GAN():
         # output layer
         model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
+        print(model.summary())
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
         return Model(lowdim, mol)
@@ -219,6 +223,7 @@ class GAN():
                                            (None, 256),
                                            (None, 1)]):
         model = Sequential()
+        model._name = "Discriminator"
         model.add(Flatten(input_shape=(self.latent_dim,)))
         model.add(Dense(params[0][1]))
         model.add(LeakyReLU(alpha=0.2))
@@ -229,6 +234,7 @@ class GAN():
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
+        print(model.summary())
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
         return Model(mol, validity)
