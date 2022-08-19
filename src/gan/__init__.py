@@ -178,6 +178,7 @@ class GAN():
                                      ("sigmoid", 8),
                                      ("linear", None)]):
         model = Sequential()
+        model._name = "Encoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -199,6 +200,7 @@ class GAN():
                                      ("sigmoid", 32),
                                      ("linear", None)]):
         model = Sequential()
+        model._name = "Decoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=self.latent_dim, activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -221,6 +223,7 @@ class GAN():
                                            (None, 256),
                                            (None, 1)]):
         model = Sequential()
+        model._name = "Discriminator"
         model.add(Flatten(input_shape=(self.latent_dim,)))
         model.add(Dense(params[0][1]))
         model.add(LeakyReLU(alpha=0.2))
