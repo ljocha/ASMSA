@@ -188,6 +188,7 @@ class GAN():
         model.add(BatchNormalization(momentum=0.8))
         #output layer
         model.add(Dense(self.latent_dim, activation=params[3][0]))
+        print(model.summary())
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
         return Model(mol, lowdim)
@@ -209,6 +210,7 @@ class GAN():
         # output layer
         model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
+        print(model.summary())
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
         return Model(lowdim, mol)
@@ -229,6 +231,7 @@ class GAN():
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
+        print(model.summary())
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
         return Model(mol, validity)
