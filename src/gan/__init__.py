@@ -113,6 +113,10 @@ class GAN():
     def _compile(self):
         self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
         self.aae.compile()
+        
+        print(self.encoder.summary(expand_nested=True))
+        print(self.decoder.summary(expand_nested=True))
+        print(self.discriminator.summary(expand_nested=True))
 
         
     def _make_visualization(self, output_file=None):
@@ -184,7 +188,6 @@ class GAN():
                                      ("sigmoid", 8),
                                      ("linear", None)]):
         model = Sequential()
-        model._name = "Encoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -195,10 +198,9 @@ class GAN():
         model.add(BatchNormalization(momentum=0.8))
         #output layer
         model.add(Dense(self.latent_dim, activation=params[3][0]))
-        print(model.summary())
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
-        return Model(mol, lowdim)
+        return Model(mol, lowdim, name="Encoder")
     
     
     def _build_decoder(self, params=[("sigmoid", 8),
@@ -218,10 +220,9 @@ class GAN():
         # output layer
         model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
-        print(model.summary())
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
-        return Model(lowdim, mol)
+        return Model(lowdim, mol, name="Decoder")
 
     
     def _build_discriminator(self, params=[(None, 512),
@@ -241,10 +242,9 @@ class GAN():
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
 
-        print(model.summary())
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
-        return Model(mol, validity)
+        return Model(mol, validity, name="Discriminator")
     
     
     def set_encoder(self, params, build_decoder=False):
