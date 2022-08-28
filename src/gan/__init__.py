@@ -6,6 +6,7 @@ from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.callbacks import CSVLogger
 from keras.models import Sequential, Model
+from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras import backend as kb
 from scipy.stats import gaussian_kde
 from IPython import display
@@ -31,10 +32,10 @@ class AAEModel(Model):
 
 	def compile(self,
 		opt = Adam(0.0002,0.5),	# FIXME: justify
-		ae_loss_fn = tf.keras.losses.MeanSquaredError(),
+		ae_loss_fn = MeanSquaredError(),
 # XXX: logits as in https://keras.io/guides/customizing_what_happens_in_fit/, 
 # hope it works as the discriminator output is never used directly
-		disc_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)	
+		disc_loss_fn = BinaryCrossentropy(from_logits=True)	
 	):
 
 		super().compile()
@@ -97,9 +98,14 @@ class GAN():
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
-        self.discriminator = self._build_discriminator()
+        
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
+        self.discriminator = self._build_discriminator()
+        self.discriminator.compile(loss=BinaryCrossentropy(from_logits=True),
+                                   optimizer=Adam(0.0002, 0.5),
+                                   metrics=['accuracy'])
+        self.discriminator.trainable = False
 
         self._compile()
         
@@ -234,6 +240,7 @@ class GAN():
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
+
         print(model.summary())
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
@@ -287,10 +294,10 @@ class GAN():
         tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
         csv_logger = CSVLogger(logdir + 'log.csv', append=False, separator=';')
 
-        callbacks = None
+        callbacks = [csv_logger, tensorboard_callback]
         if visualize_freq:
-            callbacks = [GAN.VisualizeCallback(self,visualize_freq), csv_logger, tensorboard_callback]
-
+            callbacks.append(GAN.VisualizeCallback(self,visualize_freq))
+            
         self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
 
         newlows = self.encoder(self.X_train)
