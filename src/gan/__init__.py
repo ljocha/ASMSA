@@ -183,9 +183,9 @@ class GAN():
         os.chdir(os.path.expanduser("~"))
         
         
-    def _build_encoder(self, params=[("sigmoid", 32),
-                                     ("sigmoid", 16),
-                                     ("sigmoid", 8),
+    def _build_encoder(self, params=[("relu", 32),
+                                     ("relu", 16),
+                                     ("relu", 8),
                                      ("linear", None)]):
         model = Sequential()
         # input layer
@@ -203,9 +203,9 @@ class GAN():
         return Model(mol, lowdim, name="Encoder")
     
     
-    def _build_decoder(self, params=[("sigmoid", 8),
-                                     ("sigmoid", 16),
-                                     ("sigmoid", 32),
+    def _build_decoder(self, params=[("relu", 8),
+                                     ("relu", 16),
+                                     ("relu", 32),
                                      ("linear", None)]):
         model = Sequential()
         model._name = "Decoder"
