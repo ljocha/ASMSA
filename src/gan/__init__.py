@@ -6,6 +6,7 @@ from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.callbacks import CSVLogger
 from keras.models import Sequential, Model
+from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras import backend as kb
 from scipy.stats import gaussian_kde
 from IPython import display
@@ -31,10 +32,10 @@ class AAEModel(Model):
 
 	def compile(self,
 		opt = Adam(0.0002,0.5),	# FIXME: justify
-		ae_loss_fn = tf.keras.losses.MeanSquaredError(),
+		ae_loss_fn = MeanSquaredError(),
 # XXX: logits as in https://keras.io/guides/customizing_what_happens_in_fit/, 
 # hope it works as the discriminator output is never used directly
-		disc_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)	
+		disc_loss_fn = BinaryCrossentropy(from_logits=True)	
 	):
 
 		super().compile()
@@ -92,21 +93,31 @@ class AAEModel(Model):
 
 
 class GAN():
-    def __init__(self, x_train, out_file = 'lows.txt'):
+    def __init__(self, x_train, out_file = 'lows.txt', verbose=False):
         self.X_train = x_train
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
-        self.discriminator = self._build_discriminator()
+        
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
+        self.discriminator = self._build_discriminator()
+        self.discriminator.compile(loss=BinaryCrossentropy(from_logits=True),
+                                   optimizer=Adam(0.0002, 0.5),
+                                   metrics=['accuracy'])
+        self.discriminator.trainable = False
 
-        self._compile()
+        self._compile(verbose)
         
         
-    def _compile(self):
+    def _compile(self, verbose=False):
         self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
         self.aae.compile()
+        
+        if verbose:
+            print(self.encoder.summary(expand_nested=True))
+            print(self.decoder.summary(expand_nested=True))
+            print(self.discriminator.summary(expand_nested=True))
 
         
     def _make_visualization(self, output_file=None):
@@ -173,12 +184,11 @@ class GAN():
         os.chdir(os.path.expanduser("~"))
         
         
-    def _build_encoder(self, params=[("sigmoid", 32),
-                                     ("sigmoid", 16),
-                                     ("sigmoid", 8),
+    def _build_encoder(self, params=[("selu", 32),
+                                     ("selu", 16),
+                                     ("selu", 8),
                                      ("linear", None)]):
         model = Sequential()
-        model._name = "Encoder"
         # input layer
         model.add(Dense(params[0][1], input_dim=np.prod(self.mol_shape), activation=params[0][0]))
         model.add(BatchNormalization(momentum=0.8))
@@ -189,15 +199,14 @@ class GAN():
         model.add(BatchNormalization(momentum=0.8))
         #output layer
         model.add(Dense(self.latent_dim, activation=params[3][0]))
-        print(model.summary())
         mol = Input(shape=self.mol_shape)
         lowdim = model(mol)
-        return Model(mol, lowdim)
+        return Model(mol, lowdim, name="Encoder")
     
     
-    def _build_decoder(self, params=[("sigmoid", 8),
-                                     ("sigmoid", 16),
-                                     ("sigmoid", 32),
+    def _build_decoder(self, params=[("selu", 8),
+                                     ("selu", 16),
+                                     ("selu", 32),
                                      ("linear", None)]):
         model = Sequential()
         model._name = "Decoder"
@@ -212,10 +221,9 @@ class GAN():
         # output layer
         model.add(Dense(np.prod(self.mol_shape), activation=params[3][0]))
         model.add(Reshape(self.mol_shape))
-        print(model.summary())
         lowdim = Input(shape=(self.latent_dim,))
         mol = model(lowdim)
-        return Model(lowdim, mol)
+        return Model(lowdim, mol, name="Decoder")
 
     
     def _build_discriminator(self, params=[(None, 512),
@@ -234,13 +242,13 @@ class GAN():
 # changed to match logit use in AAE.train_step()
 #        model.add(Dense(1, activation='sigmoid'))
         model.add(Dense(params[3][1]))
-        print(model.summary())
+
         mol = Input(shape=(self.latent_dim,))
         validity = model(mol)
-        return Model(mol, validity)
+        return Model(mol, validity, name="Discriminator")
     
     
-    def set_encoder(self, params, build_decoder=False):
+    def set_encoder(self, params, build_decoder=False, verbose=False):
         model = self._build_encoder(params)
         self.encoder = model
         
@@ -248,20 +256,29 @@ class GAN():
             # reverse parameters (output layer of decoder is the same as encoders')
             # e.g [1,2,3,4] -> [3,2,1,4]
             reversed_params = params[:-1][::-1] + params[-1:]
-            self.set_decoder(reversed_params)
+            self.set_decoder(reversed_params, verbose)
         self._compile()
         
+        if verbose:
+            print(self.encoder.summary(expand_nested=True))
         
-    def set_decoder(self, params):
+        
+    def set_decoder(self, params, verbose=False):
         model = self._build_decoder(params)
         self.decoder = model
         self._compile()
         
+        if verbose:
+            print(self.decoder.summary(expand_nested=True))
         
-    def set_discriminator(self, params):
+        
+    def set_discriminator(self, params, verbose=False):
         model = self._build_discriminator(params)
         self.discriminator = model
         self._compile()
+        
+        if verbose:
+            print(self.discriminator.summary(expand_nested=True))
         
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
@@ -287,10 +304,10 @@ class GAN():
         tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
         csv_logger = CSVLogger(logdir + 'log.csv', append=False, separator=';')
 
-        callbacks = None
+        callbacks = [csv_logger, tensorboard_callback]
         if visualize_freq:
-            callbacks = [GAN.VisualizeCallback(self,visualize_freq), csv_logger, tensorboard_callback]
-
+            callbacks.append(GAN.VisualizeCallback(self,visualize_freq))
+            
         self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
 
         newlows = self.encoder(self.X_train)
