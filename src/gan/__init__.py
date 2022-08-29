@@ -256,7 +256,7 @@ class GAN():
             # reverse parameters (output layer of decoder is the same as encoders')
             # e.g [1,2,3,4] -> [3,2,1,4]
             reversed_params = params[:-1][::-1] + params[-1:]
-            self.set_decoder(reversed_params)
+            self.set_decoder(reversed_params, verbose)
         self._compile()
         
         if verbose:
