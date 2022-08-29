@@ -93,7 +93,7 @@ class AAEModel(Model):
 
 
 class GAN():
-    def __init__(self, x_train, out_file = 'lows.txt'):
+    def __init__(self, x_train, out_file = 'lows.txt', verbose=False):
         self.X_train = x_train
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
@@ -107,16 +107,17 @@ class GAN():
                                    metrics=['accuracy'])
         self.discriminator.trainable = False
 
-        self._compile()
+        self._compile(verbose)
         
         
-    def _compile(self):
+    def _compile(self, verbose=False):
         self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
         self.aae.compile()
         
-        print(self.encoder.summary(expand_nested=True))
-        print(self.decoder.summary(expand_nested=True))
-        print(self.discriminator.summary(expand_nested=True))
+        if verbose:
+            print(self.encoder.summary(expand_nested=True))
+            print(self.decoder.summary(expand_nested=True))
+            print(self.discriminator.summary(expand_nested=True))
 
         
     def _make_visualization(self, output_file=None):
@@ -247,7 +248,7 @@ class GAN():
         return Model(mol, validity, name="Discriminator")
     
     
-    def set_encoder(self, params, build_decoder=False):
+    def set_encoder(self, params, build_decoder=False, verbose=False):
         model = self._build_encoder(params)
         self.encoder = model
         
@@ -258,17 +259,26 @@ class GAN():
             self.set_decoder(reversed_params)
         self._compile()
         
+        if verbose:
+            print(self.encoder.summary(expand_nested=True))
         
-    def set_decoder(self, params):
+        
+    def set_decoder(self, params, verbose=False):
         model = self._build_decoder(params)
         self.decoder = model
         self._compile()
         
+        if verbose:
+            print(self.decoder.summary(expand_nested=True))
         
-    def set_discriminator(self, params):
+        
+    def set_discriminator(self, params, verbose=False):
         model = self._build_discriminator(params)
         self.discriminator = model
         self._compile()
+        
+        if verbose:
+            print(self.discriminator.summary(expand_nested=True))
         
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
