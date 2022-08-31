@@ -7,7 +7,8 @@ RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
 RUN pip3 install jupyterhub mdtraj matplotlib nglview==3.0.1
-
+# need to downgrade ipywidgets to <8 version
+RUN pip3 install -Iv ipywidgets==7.7.2
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
