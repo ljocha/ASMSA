@@ -4,7 +4,7 @@ from tensorflow.keras.optimizers import Adam
 from keras.layers import Input, Dense, Reshape, Flatten
 from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
-from keras.callbacks import CSVLogger
+from keras.callbacks import CSVLogger, EarlyStopping
 from keras.models import Sequential, Model
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras import backend as kb
@@ -248,6 +248,13 @@ class GAN():
         return Model(mol, validity, name="Discriminator")
     
     
+    def _get_earlystop_callback(self, monitor):
+        return EarlyStopping(monitor=monitor,
+                                     patience=6,
+                                     verbose=1,
+                                     mode='min')
+    
+    
     def set_encoder(self, params, build_decoder=False, verbose=False):
         model = self._build_encoder(params)
         self.encoder = model
@@ -295,7 +302,13 @@ class GAN():
                 plt.pause(0.01)
 				    
 
-    def train(self, epochs, batch_size=256, visualize_freq=False): 
+    def train(self, 
+              epochs,
+              batch_size=256, 
+              visualize_freq=False, 
+              ae_estop=False, 
+              d_estop=False
+             ): 
 
         dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
         dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
@@ -303,8 +316,24 @@ class GAN():
         logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
         csv_logger = CSVLogger(logdir + 'log.csv', append=False, separator=';')
-
         callbacks = [csv_logger, tensorboard_callback]
+        
+        
+        # set EarlyStopping for autoencoder
+        if ae_estop:
+            if isinstance(ae_estop, EarlyStopping):
+                callbacks.append(ae_estop)
+            else:
+                callbacks.append(self._get_earlystop_callback(monitor="ae_loss"))
+            
+        # set EarlyStopping for discriminator
+        if d_estop:
+            if isinstance(d_estop, EarlyStopping):
+                callbacks.append(d_estop)
+            else:
+                callbacks.append(self._get_earlystop_callback(monitor="d_loss"))
+
+                
         if visualize_freq:
             callbacks.append(GAN.VisualizeCallback(self,visualize_freq))
             
