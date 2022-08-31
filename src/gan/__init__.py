@@ -295,7 +295,7 @@ class GAN():
                 plt.pause(0.01)
 				    
 
-    def train(self, epochs, batch_size=128, visualize_freq=False): 
+    def train(self, epochs, batch_size=256, visualize_freq=False): 
 
         dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
         dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
