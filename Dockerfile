@@ -7,7 +7,7 @@ RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
 RUN pip3 install jupyterhub mdtraj matplotlib nglview==3.0.1
-RUN jupyter-nbextension enable nglview --py --sys-prefix
+
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan
