@@ -6,7 +6,7 @@ ENV TZ=Europe/Prague
 RUN apt update
 RUN apt install -y python3-notebook python3-pip
 
-RUN pip3 install jupyterhub mdtraj matplotlib
+RUN pip3 install jupyterhub mdtraj matplotlib nglview==3.0.1
 
 WORKDIR /home/jovyan
 ENV HOME /home/jovyan

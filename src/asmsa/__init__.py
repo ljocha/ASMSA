@@ -22,7 +22,7 @@ def next_prime(n):
 	return int(_primes[np.searchsorted(_primes, n)])
 
 
-def _parse_top(top):
+def _parse_top(top,ndx = None):
 	anums = []
 	types = []
 	bonds = []
@@ -65,15 +65,60 @@ def _parse_top(top):
 	for i,n in enumerate(anums):
 		aidx[n] = i
 
+
+	bonds = map(lambda b: [aidx[b[0]], aidx[b[1]]], bonds)
+	angles = map(lambda a: [aidx[a[0]], aidx[a[1]], aidx[a[2]]], angles)
+	dihed4 = map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]],
+                                  filter(lambda d: d[4] == 4, dihedrals)
+                              )
+	dihed9 = map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]],
+                                  filter(lambda d: d[4] == 9, dihedrals)
+                              )
+
+	if ndx:
+# read index file
+		with open(ndx) as f:
+			f.readline()
+			ndxs = " ".join(f)
+
+		idx = np.fromstring(ndxs,dtype=int,sep=' ')
+		idx -= 1
+
+# filter out hydrogens and apply the index
+		isheavy = [ False ] * len(types)
+		sqidx = [ -1 ] * len(types)
+		hnum = 0
+		for i,t in enumerate(types):
+			if types[i][0] != 'H':
+				isheavy[i] = True
+				sqidx[i] = idx[hnum]
+				hnum += 1
+
+		types = list(filter(lambda t: t[0] != 'H', types))
+		ntypes = ['*'] * len(types)
+		for i,t in enumerate(types):
+			ntypes[idx[i]] = t
+		types = ntypes
+		
+		bonds = map(lambda b: [sqidx[b[0]],sqidx[b[1]]],
+							filter(lambda b: isheavy[b[0]] and isheavy[b[1]], bonds)
+						)
+		angles = map(lambda a: [sqidx[a[0]],sqidx[a[1]],sqidx[a[2]]],
+							filter(lambda a: isheavy[a[0]] and isheavy[a[1]] and isheavy[a[2]], angles)
+						)
+		dihed4 = map(lambda d: [sqidx[d[0]],sqidx[d[1]],sqidx[d[2]],sqidx[d[3]]],
+							filter(lambda d: isheavy[d[0]] and isheavy[d[1]] and isheavy[d[2]] and isheavy[d[3]], dihed4)
+						)
+		dihed9 = map(lambda d: [sqidx[d[0]],sqidx[d[1]],sqidx[d[2]],sqidx[d[3]]],
+							filter(lambda d: isheavy[d[0]] and isheavy[d[1]] and isheavy[d[2]] and isheavy[d[3]], dihed9)
+						)
+
+
 	return (types,
-		np.array(list(map(lambda b: [aidx[b[0]], aidx[b[1]]], bonds)),dtype=np.int32),
-		np.array(list(map(lambda a: [aidx[a[0]], aidx[a[1]], aidx[a[2]]], angles)),dtype=np.int32),
-		np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
-																	filter(lambda d: d[4] == 4, dihedrals)
-															)),dtype=np.int32),
-		np.array(list(map(lambda d: [aidx[d[0]], aidx[d[1]], aidx[d[2]], aidx[d[3]]], 
-																	filter(lambda d: d[4] == 9, dihedrals)
-															)),dtype=np.int32)
+		np.array(list(bonds),dtype=np.int32),
+		np.array(list(angles),dtype=np.int32),
+		np.array(list(dihed4),dtype=np.int32),
+		np.array(list(dihed9),dtype=np.int32)
 	)
 
 
@@ -165,14 +210,22 @@ class NBDistancesDense(FeatureMap):
 
 class Molecule:
 
-	def __init__(self,pdb,top,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',fms=[]):
-		# XXX: unused self.ref = md.load_pdb(pdb)
+	def __init__(self,pdb = None,top = None, ndx = None,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',fms=[]):
 
 		if not top and not fms:
 			raise ValueError("At least one of `top` or `fms` must be provided")
 
 		if top:
-			self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top)
+			if ndx:
+				if not pdb:
+					raise ValueError("PDB required with index")
+
+				self.ref = md.load_pdb(pdb)
+				hs = self.ref[0].top.select("element == H")
+				if hs:
+					raise ValueError("Reindexing not reliable with explicit hydrogens")
+				
+			self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top,ndx)
 			btypes,atypes,d4types,d9types = _parse_ff(ff)
 			self._match_bonds(btypes)
 			self._match_angles(atypes)

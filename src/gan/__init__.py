@@ -16,88 +16,92 @@ import datetime
 import os
 
 
-
-def _normal_prior(shape):
-	return tf.random.normal(shape=shape)
-
 class AAEModel(Model):
-	def __init__(self,enc,dec,disc,lowdim,prior = _normal_prior):
-		super().__init__()
-		self.enc = enc
-		self.dec = dec
-		self.disc = disc
-		self.lowdim = lowdim
-		self.prior = prior
+    def __init__(self,enc,dec,disc,lowdim,prior):
+        super().__init__()
+        self.enc = enc
+        self.dec = dec
+        self.disc = disc
+        self.lowdim = lowdim
+        self.prior = prior
 
 
-	def compile(self,
-		opt = Adam(0.0002,0.5),	# FIXME: justify
-		ae_loss_fn = MeanSquaredError(),
+    def compile(self,
+        opt = Adam(0.0002,0.5),	# FIXME: justify
+        ae_loss_fn = MeanSquaredError(),
 # XXX: logits as in https://keras.io/guides/customizing_what_happens_in_fit/, 
 # hope it works as the discriminator output is never used directly
-		disc_loss_fn = BinaryCrossentropy(from_logits=True)	
-	):
+        disc_loss_fn = BinaryCrossentropy(from_logits=True)	
+    ):
 
-		super().compile()
-		self.opt = opt
-		self.ae_loss_fn = ae_loss_fn
-		self.disc_loss_fn = disc_loss_fn
+        super().compile()
+        self.opt = opt
+        self.ae_loss_fn = ae_loss_fn
+        self.disc_loss_fn = disc_loss_fn
 
-	def train_step(self,batch):
-		if isinstance(batch,tuple):
-			batch = batch[0]
+        
+    def train_step(self,batch):
+        def _get_prior(name, shape):
+            if name == "normal":
+                return tf.random.normal(shape=shape)
+            if name == "uniform":
+                return tf.random.uniform(shape=shape)
+            
+            raise ValueError(f"Invalid prior type '{name}'. Choose from 'normal|uniform'")
+        
+        if isinstance(batch,tuple):
+            batch = batch[0]
 
-		batch_size = tf.shape(batch)[0]
-
+        batch_size = tf.shape(batch)[0]
 
 # improve AE to reconstruct
-		with tf.GradientTape(persistent=True) as ae_tape:
-			reconstruct = self.dec(self.enc(batch))
-			ae_loss = self.ae_loss_fn(batch,reconstruct)
+        with tf.GradientTape(persistent=True) as ae_tape:
+            reconstruct = self.dec(self.enc(batch))
+            ae_loss = self.ae_loss_fn(batch,reconstruct)
 
-		enc_grads = ae_tape.gradient(ae_loss, self.enc.trainable_weights)
-		self.opt.apply_gradients(zip(enc_grads,self.enc.trainable_weights))
+        enc_grads = ae_tape.gradient(ae_loss, self.enc.trainable_weights)
+        self.opt.apply_gradients(zip(enc_grads,self.enc.trainable_weights))
 
-		dec_grads = ae_tape.gradient(ae_loss, self.dec.trainable_weights)
-		self.opt.apply_gradients(zip(dec_grads,self.dec.trainable_weights))
+        dec_grads = ae_tape.gradient(ae_loss, self.dec.trainable_weights)
+        self.opt.apply_gradients(zip(dec_grads,self.dec.trainable_weights))
 
 # improve discriminator
-		rand_low = self.prior((batch_size,self.lowdim))
-		better_low = self.enc(batch)
-		low = tf.concat([rand_low,better_low],axis=0)
+        rand_low = _get_prior(self.prior, (batch_size, self.lowdim))
+        better_low = self.enc(batch)
+        low = tf.concat([rand_low,better_low],axis=0)
 
-		labels = tf.concat([tf.ones((batch_size,1)), tf.zeros((batch_size,1))], axis=0)
-		labels += 0.05 * tf.random.uniform(tf.shape(labels))	# guide
+        labels = tf.concat([tf.ones((batch_size,1)), tf.zeros((batch_size,1))], axis=0)
+        labels += 0.05 * tf.random.uniform(tf.shape(labels))	# guide
 
-		with tf.GradientTape() as disc_tape:
-			pred = self.disc(low)
-			disc_loss = self.disc_loss_fn(labels,pred)
+        with tf.GradientTape() as disc_tape:
+            pred = self.disc(low)
+            disc_loss = self.disc_loss_fn(labels,pred)
 
-		disc_grads = disc_tape.gradient(disc_loss,self.disc.trainable_weights)
-		self.opt.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
+        disc_grads = disc_tape.gradient(disc_loss,self.disc.trainable_weights)
+        self.opt.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
 
 # teach encoder to cheat
-		alltrue = tf.ones((batch_size,1))
+        alltrue = tf.ones((batch_size,1))
 
-		with tf.GradientTape() as cheat_tape:
-			cheat = self.disc(self.enc(batch))
-			cheat_loss = self.disc_loss_fn(alltrue,cheat)
+        with tf.GradientTape() as cheat_tape:
+            cheat = self.disc(self.enc(batch))
+            cheat_loss = self.disc_loss_fn(alltrue,cheat)
 
-		cheat_grads = cheat_tape.gradient(cheat_loss,self.enc.trainable_weights)
-		self.opt.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
+        cheat_grads = cheat_tape.gradient(cheat_loss,self.enc.trainable_weights)
+        self.opt.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
 
-		return { 'ae_loss' : ae_loss, 'd_loss' : disc_loss }
+        return { 'ae_loss' : ae_loss, 'd_loss' : disc_loss }
 
-		
-		
+
 
 
 class GAN():
-    def __init__(self, x_train, out_file = 'lows.txt', verbose=False):
+    def __init__(self, x_train, out_file = 'lows.txt', verbose=False, prior='normal'):
         self.X_train = x_train
         self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
+        self.prior = prior
         
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
@@ -111,7 +115,7 @@ class GAN():
         
         
     def _compile(self, verbose=False):
-        self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim)
+        self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim,self.prior)
         self.aae.compile()
         
         if verbose:
@@ -287,6 +291,9 @@ class GAN():
         if verbose:
             print(self.discriminator.summary(expand_nested=True))
         
+    
+    
+        
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
         def __init__(self,parent,freq):
@@ -300,7 +307,7 @@ class GAN():
                 np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
                 self.parent._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
                 plt.pause(0.01)
-				    
+    
 
     def train(self, 
               epochs,
