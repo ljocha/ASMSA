@@ -8,7 +8,7 @@ from keras.callbacks import CSVLogger, EarlyStopping
 from keras.models import Sequential, Model
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras import backend as kb
-from scipy.stats import gaussian_kde
+
 from IPython import display
 import matplotlib.pyplot as plt
 import numpy as np
@@ -96,9 +96,8 @@ class AAEModel(Model):
 
 
 class GAN():
-    def __init__(self, x_train, out_file = 'lows.txt', verbose=False, prior='normal'):
+    def __init__(self, x_train, verbose=False, prior='normal'):
         self.X_train = x_train
-        self.out_file = out_file
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
         self.prior = prior
@@ -122,71 +121,7 @@ class GAN():
             print(self.encoder.summary(expand_nested=True))
             print(self.decoder.summary(expand_nested=True))
             print(self.discriminator.summary(expand_nested=True))
-
-        
-    def _make_visualization(self, output_file=None):
-        if output_file is None:
-            output_file = self.output_file
-        
-        os.chdir(os.path.expanduser("~/visualization"))
-        lows = np.loadtxt(output_file)
-
-        rama_ala = np.loadtxt('rama_ala_reduced.txt', usecols=(0,1))
-        angever1 = np.loadtxt('angever1.txt')
-        angever2 = np.loadtxt('angever2.txt')
-        angever3 = np.loadtxt('angever3.txt')
-
-
-        cvs = (lows[:, 0], lows[:, 1])
-        analysis_files = {
-            'rama0' : rama_ala[:, 0],
-            'rama1' : rama_ala[:, 1],
-            'ang1' : angever1[:, 1],
-            'ang2' : angever2[:, 1],
-            'ang3' : angever3[:, 1]
-        }
-
-        # set limits
-        xmin, xmax = min(cvs[0]), max(cvs[0])
-        ymin, ymax = min(cvs[1]), max(cvs[1])
-
-        # plot configuration
-        plt.suptitle('Low Dimentional Space - Analysis')
-        plt.style.use("seaborn-white")
-        fig = plt.figure(figsize=(18, 10))
-        fig.supxlabel('CV1', x=0.5, fontsize=16, fontweight='bold')
-        fig.supylabel('CV2', x=0.1, fontsize=16, fontweight='bold')
-
-        # plot first graph
-        X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
-        positions = np.vstack([X.ravel(), Y.ravel()])
-        pos = np.empty(X.shape + (2,))
-        pos[:, :, 0] = X; pos[:, :, 1] = Y
-        values = np.vstack([cvs[0], cvs[1]])
-        kernel = gaussian_kde(values)
-        dens = np.reshape(kernel(positions).T, X.shape)
-        ax1 = plt.subplot(2, 3, 1)
-        ax1.set_xticks([])
-        plt.imshow(np.rot90(dens), cmap="hsv", aspect="auto", extent=[xmin, xmax, ymin, ymax])
-
-
-        # plot every other graph
-        i = 2
-        for name, data in analysis_files.items():
-            ax = plt.subplot(2, 3, i)
-            ax.set_xlim([xmin, xmax])
-            ax.set_ylim([ymin, ymax])
-            ax.set_title(name)
-            if i in [2,3,5,6]:
-                ax.set_yticks([])
-            if i in [2,3]:
-                ax.set_xticks([])
-            plt.scatter(cvs[0], cvs[1], s=1, c=data, cmap="hsv")
-            i += 1
-
-        plt.savefig('analysis_tmp.png')
-        os.chdir(os.path.expanduser("~"))
-        
+                
         
     def _build_encoder(self, params=[("selu", 32),
                                      ("selu", 16),
@@ -257,7 +192,7 @@ class GAN():
                                      patience=6,
                                      verbose=1,
                                      mode='min')
-    
+
     
     def set_encoder(self, params, build_decoder=False, verbose=False):
         model = self._build_encoder(params)
@@ -291,28 +226,28 @@ class GAN():
         if verbose:
             print(self.discriminator.summary(expand_nested=True))
         
-    
-    
-        
 
     class VisualizeCallback(tf.keras.callbacks.Callback):
-        def __init__(self,parent,freq):
+        def __init__(self,parent,visualizer):
             super().__init__()
             self.parent = parent
-            self.freq = freq
+            self.tmplows = "visualization/tmplows.txt"
+            self.visualizer = visualizer
+            self.visualizer.lows = self.tmplows
 
         def on_epoch_begin(self,epoch,logs=None):
-            if epoch % self.freq == 0:
+            if epoch % self.visualizer.frequency == 0:
                 tmplows = self.parent.encoder(self.parent.X_train)
-                np.savetxt(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt', tmplows)
-                self.parent._make_visualization(f'{os.path.expanduser("~/visualization")}' + '/tmplows.txt')
+                np.savetxt(self.tmplows, tmplows)
+                self.visualizer.make_visualization()
                 plt.pause(0.01)
     
 
     def train(self, 
               epochs,
+              out_file,
               batch_size=256, 
-              visualize_freq=False, 
+              visualizer=None,
               ae_estop=False, 
               d_estop=False
              ): 
@@ -341,10 +276,10 @@ class GAN():
                 callbacks.append(self._get_earlystop_callback(monitor="d_loss"))
 
                 
-        if visualize_freq:
-            callbacks.append(GAN.VisualizeCallback(self,visualize_freq))
+        if visualizer:
+            callbacks.append(GAN.VisualizeCallback(self,visualizer))
             
         self.aae.fit(dataset,epochs=epochs,verbose=True,callbacks=callbacks)
 
         newlows = self.encoder(self.X_train)
-        np.savetxt(self.out_file, newlows)
+        np.savetxt(out_file, newlows)
