@@ -105,10 +105,6 @@ class GAN():
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
         self.discriminator = self._build_discriminator()
-        self.discriminator.compile(loss=BinaryCrossentropy(from_logits=True),
-                                   optimizer=Adam(0.0002, 0.5),
-                                   metrics=['accuracy'])
-        self.discriminator.trainable = False
 
         self._compile(verbose)
         
