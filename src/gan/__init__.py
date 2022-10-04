@@ -8,6 +8,7 @@ from keras.callbacks import CSVLogger, EarlyStopping
 from keras.models import Sequential, Model
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras import backend as kb
+from PIL import Image
 
 from IPython import display
 import matplotlib.pyplot as plt
@@ -16,14 +17,25 @@ import datetime
 import os
 
 
+
 class AAEModel(Model):
-    def __init__(self,enc,dec,disc,lowdim,prior):
+    def __init__(self,enc,dec,disc,lowdim,prior,batch_size):
         super().__init__()
         self.enc = enc
         self.dec = dec
         self.disc = disc
         self.lowdim = lowdim
-        self.prior = prior
+        self.batch_size = batch_size
+        
+        if prior not in ['normal', 'uniform']:
+            im = Image.open(prior)
+            im_array = np.asarray(im)
+            self.prior = im_array
+            print(f'Using image {prior} as a prior.')
+        else:
+            self.prior = prior
+            print(f'Using {prior} distribution as a prior.')
+            
 
 
     def compile(self,
@@ -31,7 +43,7 @@ class AAEModel(Model):
         ae_loss_fn = MeanSquaredError(),
 # XXX: logits as in https://keras.io/guides/customizing_what_happens_in_fit/, 
 # hope it works as the discriminator output is never used directly
-        disc_loss_fn = BinaryCrossentropy(from_logits=True)	
+        disc_loss_fn = BinaryCrossentropy(from_logits=True)
     ):
 
         super().compile()
@@ -47,12 +59,48 @@ class AAEModel(Model):
             if name == "uniform":
                 return tf.random.uniform(shape=shape)
             
-            raise ValueError(f"Invalid prior type '{name}'. Choose from 'normal|uniform'")
-        
+            noise = np.zeros((self.batch_size, shape[1]), dtype=float)
+            j = 0
+            while j < self.batch_size:
+                x = np.random.uniform()
+                y = np.random.uniform()
+                xi = int(x * self.prior.shape[0])
+                yi = int(y * self.prior.shape[1])
+                if self.prior.dtype == bool:
+                    if self.prior[xi, yi]:
+                        noise[j, :] = np.array([y, 1.0 - x])
+                        j = j + 1
+                elif self.prior.dtype == 'uint8':
+                    if len(self.prior.shape) == 2:
+                        if np.random.uniform() < float(self.prior[xi, yi]):
+                            noise[j, :] = np.array([y, 1.0 - x])
+                            j = j + 1
+                elif len(self.prior.shape) == 3:
+                    shade = 0.0
+                    for k in range(3):
+                        shade = shade + float(self.prior[xi, yi, j])
+                    shade = shade / 255.0 / float(self.prior.shape[2])
+                    if np.random.uniform() < shade:
+                        noise[j, :] = np.array([y, 1.0 - x])
+                        j = j + 1
+                else:
+                    print('unknown image type')
+                    break
+
+            transposed_noise = np.transpose(noise)
+                    
+            tensor = tf.convert_to_tensor(
+                transposed_noise, dtype='float32'
+            )
+            
+            reshaped_t = tf.reshape(tensor, shape)
+
+            return reshaped_t
+            
         if isinstance(batch,tuple):
             batch = batch[0]
 
-        batch_size = tf.shape(batch)[0]
+        batch_size = self.batch_size
 
 # improve AE to reconstruct
         with tf.GradientTape(persistent=True) as ae_tape:
@@ -96,7 +144,7 @@ class AAEModel(Model):
 
 
 class GAN():
-    def __init__(self, x_train, verbose=False, prior='normal'):
+    def __init__(self, x_train, batch_size=256, verbose=False, prior='normal'):
         self.X_train = x_train
         self.mol_shape = (self.X_train.shape[1],)
         self.latent_dim = 2
@@ -105,12 +153,14 @@ class GAN():
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
         self.discriminator = self._build_discriminator()
+        self.batch_size = batch_size
+
 
         self._compile(verbose)
         
         
     def _compile(self, verbose=False):
-        self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim,self.prior)
+        self.aae = AAEModel(self.encoder,self.decoder,self.discriminator,self.latent_dim,self.prior, self.batch_size)
         self.aae.compile()
         
         if verbose:
@@ -161,9 +211,9 @@ class GAN():
         return Model(lowdim, mol, name="Decoder")
 
     
-    def _build_discriminator(self, params=[(None, 512),
-                                           (None, 256),
-                                           (None, 256),
+    def _build_discriminator(self, params=[(None, 32),
+                                           (None, 16),
+                                           (None, 8),
                                            (None, 1)]):
         model = Sequential()
         model._name = "Discriminator"
@@ -242,14 +292,13 @@ class GAN():
     def train(self, 
               epochs,
               out_file,
-              batch_size=256, 
               visualizer=None,
               ae_estop=False, 
               d_estop=False
              ): 
 
         dataset = tf.data.Dataset.from_tensor_slices(self.X_train)
-        dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
+        dataset = dataset.shuffle(buffer_size=1024).batch(self.batch_size, drop_remainder=True)
 
         logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
