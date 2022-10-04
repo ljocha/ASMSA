@@ -34,8 +34,9 @@ class GAN_visualizer():
         axes[0][0].scatter(x, y, s=0.1, cmap=self.cmap)
 
         # 2D Histogram
-        axes[0][1].set_title('2D Histogram')
-        axes[0][1].hist2d(x, y, bins=self.nbins, cmap=self.cmap)
+        hist2d = axes[0][1].set_title('2D Histogram')
+        hist2d = axes[0][1].hist2d(x, y, bins=self.nbins, cmap=self.cmap)
+        fig.colorbar(hist2d[3], ax=axes[0][2])
 
         # Evaluate a gaussian kde on a regular grid of nbins x nbins over data extents
         k = kde.gaussian_kde((x,y))
