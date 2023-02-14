@@ -2,27 +2,19 @@ from scipy.stats import kde
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import tensorflow as tf
 
 
-class GAN_visualizer():
-    def __init__(self, lows=None, analysis_files=[], figsize=None, nbins=40, visualize_freq=False, cmap=plt.cm.jet):
-        self.lows = lows
+class Visualizer():
+    def __init__(self, analysis_files=[], figsize=None, nbins=40, cmap=plt.cm.jet):
         self.analysis_files = analysis_files
         self.figsize = figsize
         self.nbins = nbins
-        self.frequency = visualize_freq
         self.cmap = cmap
         
         
-    def _load_data(self, data):
-        if self.lows == None:
-            raise ValueError("No lows file was specified. Use 'lows=XXX' flag")
-        lows_data = np.loadtxt(self.lows)    
-        return (lows_data[:, 0], lows_data[:, 1])
-        
-        
-    def make_visualization(self):
-        x, y = self._load_data(self.lows)
+    def make_visualization(self,lows):
+        x, y = lows[:,0],lows[:,1]
         
         # Create a figure with 3 columns
         ncols=3
@@ -62,3 +54,22 @@ class GAN_visualizer():
                     axes[row_i+1][col_i].set_title(_analysis_files[file_ndx][0])
                     axes[row_i+1][col_i].scatter(x, y, s=0.1, c=_analysis_files[file_ndx][1])
                     
+
+class VisualizeCallback(tf.keras.callbacks.Callback):
+	def __init__(self,model=None,visualizer=None,freq=10,inputs=None,**kwargs):
+		super().__init__()
+		assert model
+		self.model = model
+		self.inputs = inputs
+		self.freq = freq
+		if visualizer:
+			self.visualizer = visualizer
+		else:
+			self.visualizer = Visualizer(**kwargs)
+
+	def on_epoch_end(self,epoch,logs=None):
+		if epoch % self.freq == self.freq - 1:
+			lows = self.model.call_enc(self.inputs).numpy()
+			self.visualizer.make_visualization(lows)
+			plt.pause(.01)
+

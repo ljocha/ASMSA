@@ -1,15 +1,37 @@
-image=ljocha/asmsa
-port=9000
+image=$(shell cat IMAGE | cut -d: -f1)
+tag=$(shell cat IMAGE | cut -d: -f2)
+
+port?=9000
+
+build: package-build docker-build
 
 package-build:
 	python3 -m build
 
 docker-build: 
 	docker build -t ${image} .
+	docker tag ${image}:latest ${image}:${tag}
+	docker push ${image}:latest 
+	docker push ${image}:${tag}
 
-docker-run:
-	docker run -p ${port}:${port} -u $(shell id -u) -w /work -v ${PWD}:/work ${image} jupyter-lab --ip 0.0.0.0 --port ${port}
+docker-amd:
+	docker build -f Dockerfile.amd -t ${image}:amd .
 
-docker-bash:
-	docker run -ti -p ${port}:${port} -u $(shell id -u) -w /work -v ${PWD}:/work ${image} bash
+gpus?=--gpus all
+flags=${gpus} --rm -u $(shell id -u) -w /work -v ${PWD}:/work -e HOME=/work  --entrypoint /work/start_in_venv.sh
+# flags=--rm -p ${port}:${port} -u $(shell id -u) -w /work -v ${PWD}:/work -e HOME=/work  --entrypoint /usr/bin/env
+
+amdflags=--rm -u $(shell id -u) -w /work -v ${PWD}:/work -e HOME=/work  --entrypoint /work/start_in_venv.sh -p ${port}:${port} --device=/dev/kfd --device=/dev/dri --shm-size 16G --group-add video --group-add render 
+
+lab notebook:
+	docker run ${flags} -p ${port}:${port} ${image} jupyter-$@ --ip 0.0.0.0 --port ${port}
+
+bash:
+	docker run -ti ${flags} -p ${port}:${port} ${image} bash
+
+nonet:
+	docker run -ti ${flags} ${image} bash
+
+amd:
+	docker run -ti ${amdflags} ${image}:amd bash
 
