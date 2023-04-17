@@ -31,9 +31,6 @@ RUN . bin/activate && pip install git+https://github.com/onnx/tensorflow-onnx &&
 
 RUN . bin/activate && jupyter-nbextension enable nglview --py 
 
-COPY dist/asmsa-0.0.1.tar.gz /tmp
-RUN . bin/activate && pip3 install /tmp/asmsa-0.0.1.tar.gz && rm -r /home/jovyan/.cache
-
 RUN . bin/activate && pip3 install kubernetes dill && rm -r /home/jovyan/.cache
 
 USER root
@@ -41,10 +38,13 @@ RUN apt update && apt install -y curl && curl -LO "https://dl.k8s.io/release/$(c
 
 RUN apt update && apt install -y rocblas miopen-hip hipfft rocrand rocfft && apt clean && rm -rf /var/lib/apt/lists/*
 
+COPY dist/asmsa-0.0.1.tar.gz /tmp
+RUN . bin/activate && pip3 install /tmp/asmsa-0.0.1.tar.gz && rm -rf /home/jovyan/.cache
+
 USER jovyan
 
 RUN mkdir /home/jovyan/ASMSA
-COPY IMAGE asmsa.ipynb /home/jovyan/ASMSA/
+COPY IMAGE /home/jovyan/ASMSA/
 COPY tuning.py tuning.sh /usr/local/bin/
 WORKDIR /home/jovyan
 
