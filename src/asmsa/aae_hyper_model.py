@@ -1,4 +1,3 @@
-#! vim: ai ts=4:
 import keras_tuner as kt
 import numpy as np
 from tensorflow import keras
@@ -64,55 +63,25 @@ class _KLGatherCallback(keras.callbacks.Callback):
 		self.kl = []
 
 	def on_epoch_end(self,epoch,logs=None):
-		print('\n\nPosterior on valdata ...',end='')
-		prior = self.model.get_prior((self.valdata.shape[0],)).numpy()
-		posterior = self.model.call_enc(self.valdata).numpy()
-
-		kls = []
-		print('\nKL divergences ',end='')
-		for m in range(self.model.n_models):
-			kl = _KLdivergence(prior,posterior[:,m*self.model.latent_dim:(m+1)*self.model.latent_dim])
-			if kl < 0.: kl = 0. 
-			kls.append(kl)
-			print('.',end='')
-		print()
+		prior = self.model.get_prior((self.valdata.shape[0],))
+		posterior = self.model.call_enc(self.valdata)
+		kl = _KLdivergence(prior,posterior)
+		if kl < 0.: kl = 0. 
 		
-		self.kl.append(kls)
+		self.kl.append(kl)
 
 	def get_metric(self,start=0.):
 		nkl = np.array(self.kl[int(len(self.kl) * start):])
-		klmean = np.mean(nkl,axis=0)
-		klvar = np.var(nkl,axis=0)
-
-		return np.min(klmean + klvar)
+		return [np.var(nkl), np.mean(nkl)]
 
 		
 
 class AAEHyperModel(kt.HyperModel):
 
-	def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior='normal',hp=None):
+	def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior='normal',hpfunc=None):
 		super().__init__()
-		assert hp
-		self.keras_hp = {}
-
-		for k,v in hp.items():
-			if isinstance(v,range):
-				v = list(v)
-			elif not isinstance(v,list):
-				v = [ v ]
-
-			if k == 'ae_neuron_number_seed':
-				aes = v
-			elif k == 'disc_neuron_number_seed':
-				dis = v
-			else:
-				self.keras_hp[k] = v
-
-		el = len(aes)
-		dl = len(dis)
-		self.enc_seeds = aes * dl
-		self.disc_seeds = list(np.repeat(np.array(dis),el,axis=0))
-		
+		assert hpfunc
+		self.hpfunc = hpfunc
 		self.molecule_shape = molecule_shape
 		self.latent_dim = latent_dim
 		self.prior = prior
@@ -120,22 +89,15 @@ class AAEHyperModel(kt.HyperModel):
 
 
 	def build(self,hp):
-		for k,v in self.keras_hp.items():
-			hp.Choice(k,v)
-
-		mod = AAEModel(molecule_shape=self.molecule_shape,latent_dim=self.latent_dim,prior=self.prior,
-			enc_layers = hp['ae_number_of_layers'], enc_seed = self.enc_seeds,
-			disc_layers = hp['disc_number_of_layers'], disc_seed = self.disc_seeds,
-			hp=hp)
+		myhp = self.hpfunc(hp)
+		mod = AAEModel(molecule_shape=self.molecule_shape,latent_dim=self.latent_dim,prior=self.prior,hp=myhp)
 		mod.compile()
 		return mod
 
 
-	def fit(self, hp, model, train, validation=None, callbacks=[], **kwargs):
-		if validation is None:
-			validation = train[::5]		# XXX 
-		klcb = _KLGatherCallback(model,validation)
-		train = tf.data.Dataset.from_tensor_slices(train)\
+	def fit(self, hp, model, x, callbacks=[], **kwargs):
+		klcb = _KLGatherCallback(model,x)
+		train = tf.data.Dataset.from_tensor_slices(x)\
 			.cache()\
 			.shuffle(2048)\
 			.batch(hp['batch_size'],drop_remainder=True)\
