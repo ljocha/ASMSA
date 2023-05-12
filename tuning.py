@@ -109,12 +109,4 @@ tuner = keras_tuner.RandomSearch(
 
 tuner.search(X_train,epochs=epochs)
 
-if tuner_id == 'chief':
-	with open(output,'w') as of:
-		of.write('[\n')
-		for b in tuner.get_best_hyperparameters(num_trials=trials):
-			of.write('	'+str(b.values)+',\n')
-
-		of.write(']\n')
-
 print(f"{tuner_id}: Done!")
