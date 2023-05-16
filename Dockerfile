@@ -40,7 +40,8 @@ RUN . bin/activate && pip install git+https://github.com/onnx/tensorflow-onnx &&
 
 RUN . bin/activate && jupyter-nbextension enable nglview --py 
 
-ARG DIST=asmsa-0.0.1.tar.gz
+ARG DIST=asmsa-0.0.2.tar.gz
+
 COPY dist/$DIST /tmp
 RUN . bin/activate && pip3 install /tmp/$DIST && rm -r /home/jovyan/.cache
 
