@@ -3,7 +3,12 @@ import keras_tuner as kt
 import numpy as np
 from tensorflow import keras
 import tensorflow as tf
+import pickle
 from datetime import datetime
+import dict_hash 
+from pathlib import Path
+import os
+import copy
 
 from .aae_model import AAEModel
 from torch.utils.tensorboard import SummaryWriter
@@ -56,31 +61,46 @@ def _KLdivergence(x, y):
     # on the first term of the right hand side.
     return -np.log(r/s).sum() * d / n + np.log(m / (n - 1.))
 
-from datetime import datetime
+
 class _KLGatherCallback(keras.callbacks.Callback):
-    def __init__(self,model,valdata,trial_id,start_time):
+    def __init__(self,model,valdata,tuning_threshold):
         super().__init__()
         self.set_model(model)
         self.valdata = valdata
-        self.trial_id = trial_id
-        self.start_time = start_time
+        # make trial_id unique throughout tunings
+        hp_values = copy.deepcopy(self.model.hp.values)
+        hp_values['datettime'] = datetime.today().strftime("%m%d%Y-%H%M%S.%f")
+        self.trial_id = dict_hash.sha256(hp_values)
+        self.tuning_threshold = tuning_threshold
 
     def on_train_begin(self,logs=None):
         self.kl = []
+        print(f'Trial ID: {self.trial_id}')
+
+        # set template for writing of results
+        self.d = {
+            "trial_id" : self.trial_id,
+            "hp" : self.model.hp.values,
+            "results" : {},
+            "score" : None
+        }
         
-        self.summary_writer = SummaryWriter(f'/home/jovyan/ASMSA/multipleruns/{self.start_time}/{self.trial_id}')
         self.multibatch = tf.stack([self.valdata]*self.model.n_models,axis=1)
         
     def on_train_end(self,epoch,logs=None):
-        self.summary_writer.close()
+        self.d['score'] = self.get_metric(self.tuning_threshold)
+        workdir = os.environ['PWD']
+        tuning_path = f'{workdir}/ASMSA_visualization/{os.environ["START_TIME"]}'
+        
+        Path(tuning_path).mkdir(parents=True, exist_ok=True)
+        obj = f"{tuning_path}/{self.trial_id}"
+        pickle.dump( self.d, open( obj, "wb" ) )
 
     def on_epoch_end(self,epoch,logs=None):
-        print('\n\nPosterior on valdata ...',end='')
         prior = self.model.get_prior((self.valdata.shape[0],)).numpy()
         posterior = self.model.call_enc(self.valdata).numpy()
 
         kls = []
-        print('\nKL divergences ',end='')
         for m in range(self.model.n_models):
             kl = _KLdivergence(prior,posterior[:,m*self.model.latent_dim:(m+1)*self.model.latent_dim])
             if kl < 0.: kl = 0. 
@@ -105,18 +125,26 @@ class _KLGatherCallback(keras.callbacks.Callback):
         pos_losses = -tf.reduce_mean(pos_pred*tf.random.uniform(tf.shape(pos_pred),1.,1.05),axis=0)
         dn_losses = neg_losses + pos_losses
 
-        ae_losses = {}
-        disc_losses = {}
-        kl_divergencies = {}
         for i in range(0, len(self.model.enc_seed)):
-            name = f"model_AE{self.model.enc_seed[i]}_DN{self.model.disc_seed[i]}"
-            ae_losses[name] = ae_multiloss[i].numpy()
-            disc_losses[name] = dn_losses[i].numpy()
-            kl_divergencies[name] = kls[i]
-
-        self.summary_writer.add_scalars(f'Autoencoder_loss', ae_losses, epoch)
-        self.summary_writer.add_scalars(f'Discriminator_loss', disc_losses, epoch)
-        self.summary_writer.add_scalars(f'KL_divergence', kl_divergencies, epoch)
+            model = f"model_AE{self.model.enc_seed[i]}_DN{self.model.disc_seed[i]}"
+            
+            self._log(model=model,
+                      ae=ae_multiloss[i].numpy(),
+                      dn=dn_losses[i].numpy(),
+                      kl=kls[i])
+            
+    def _log(self,model,ae=None,dn=None,kl=None):
+        try:
+            self.d['results'][model]['ae_loss'].append(ae)
+            self.d['results'][model]['dn_loss'].append(dn)
+            self.d['results'][model]['kl_div'].append(kl)
+        except KeyError:
+            self.d['results'][model] = {
+                'ae_loss' : [],
+                'dn_loss' : [],
+                'kl_div' : []
+            }
+            self._log(model,ae,dn,kl)
         
 
     def get_metric(self,start=0.):
@@ -157,8 +185,6 @@ class AAEHyperModel(kt.HyperModel):
         self.latent_dim = latent_dim
         self.prior = prior
         self.tuning_threshold = tuning_threshold
-        self.trial_id = 1
-        self.start_time = datetime.today().strftime("%H-%M-%S")
 
 
     def build(self,hp):
@@ -176,7 +202,7 @@ class AAEHyperModel(kt.HyperModel):
     def fit(self, hp, model, train, validation=None, callbacks=[], **kwargs):
         if validation is None:
             validation = train[::5]		# XXX 
-        klcb = _KLGatherCallback(model,validation,self.trial_id,self.start_time)
+        klcb = _KLGatherCallback(model,validation,self.tuning_threshold)
         # logcb = LogCallback(model,1,validation)
         train = tf.data.Dataset.from_tensor_slices(train)\
             .cache()\
@@ -185,7 +211,6 @@ class AAEHyperModel(kt.HyperModel):
             .prefetch(tf.data.experimental.AUTOTUNE)
 
         super().fit(hp, model, train, callbacks=callbacks + [klcb], **kwargs)
-        self.trial_id += 1
 
         return klcb.get_metric(self.tuning_threshold)
 
