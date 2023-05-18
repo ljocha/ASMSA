@@ -1,247 +1,290 @@
+#! vim: ai ts=4:
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 import PIL
 
-def _compute_number_of_neurons(params,ae):
-	neurons = [params['ae_neuron_number_seed']]
-	tmp = params['ae_neuron_number_seed']
-	for _ in range(params['ae_number_of_layers'] if ae else params['disc_number_of_layers']):
-		tmp = int(tmp / 2)
-		neurons.append(tmp)
-	return neurons
-
-
-def _build_encoder(molecule_shape,latent_dim,hparams):
-	model = keras.models.Sequential(name='Encoder')
-	model.add(keras.Input(shape=molecule_shape,name='enc.input'))
-
-	neurons = _compute_number_of_neurons(hparams,ae=True)
-
-	model.add(keras.layers.Dense(neurons[0], activation=hparams['activation'],name='enc.0'))
-	model.add(keras.layers.BatchNormalization(momentum=0.8))
-
-	# hidden layers
-	for i in range(hparams['ae_number_of_layers']):
-		model.add(keras.layers.Dense(neurons[i+1], activation=hparams['activation'], name=f'enc.{i+1}'))
-		model.add(keras.layers.BatchNormalization(momentum=0.8))
-
-	#output layer
-	model.add(keras.layers.Dense(latent_dim, activation="linear",name='enc.output'))
-
-	return model
-
-
-def _build_decoder(molecule_shape,latent_dim,hparams):
-	model = keras.models.Sequential(name='Decoder')
-	model.add(keras.Input(shape=(latent_dim,),name='dec.input'))
-	
-	neurons = _compute_number_of_neurons(hparams,ae=True)[::-1]
-	
-	model.add(keras.layers.Dense(neurons[0], activation="linear",name='dec.0'))
-	model.add(keras.layers.BatchNormalization(momentum=0.8))
-	
-	# hidden layers
-	for i in range(hparams['ae_number_of_layers']):
-		model.add(keras.layers.Dense(neurons[i+1], activation=hparams['activation'],name=f'dec.{i+1}'))
-		model.add(keras.layers.BatchNormalization(momentum=0.8))
-
-	# output layer
-	model.add(keras.layers.Dense(np.prod(molecule_shape), activation=hparams['activation'],name='dec.output'))
-	model.add(keras.layers.Reshape(molecule_shape,name='dec.reshape'))
-	return model
-
-
-def _build_discriminator(latent_dim,hparams):
-	model = keras.models.Sequential(name='Discriminator')
-	model.add(keras.Input(shape=(latent_dim,),name='disc.input'))
-
-	neurons = _compute_number_of_neurons(hparams,ae=False)
-
-	# model.add(keras.layers.Flatten(input_shape=(latent_dim,)))
-	# hidden layers
-	for i in range(hparams['disc_number_of_layers']):
-		model.add(keras.layers.Dense(neurons[i],name=f'disc.{i}'))
-		model.add(keras.layers.LeakyReLU(alpha=0.2))
-	model.add(keras.layers.Dense(1,name='disc.output'))
-
-	return model
+def _compute_number_of_neurons(layers,seed):
+    neurons = [seed]
+    tmp = seed
+    for _ in range(layers):
+        tmp = int(tmp / 2)
+        neurons.append(tmp)
+    return neurons
 
 
 
 _default_hp = {
-	'batch_size' : 64,
-	'activation' : 'relu',
-	'ae_number_of_layers': 2,
-	'disc_number_of_layers': 2,
-	'ae_neuron_number_seed' : 32,
-	'disc_neuron_number_seed' : 32,
-	'ae_loss_fn': 'MeanSquaredError',
-	'disc_loss_fn': 'BinaryCrossentropy',
-	'optimizer': 'Adam',
-#	'ae_loss_fn': keras.losses.MeanSquaredError(),
-#	'disc_loss_fn': keras.losses.BinaryCrossentropy(from_logits=True),
-#	'optimizer': keras.optimizers.Adam(0.0002,0.5),
+    'activation' : 'gelu',
+    'ae_loss_fn': 'MeanSquaredError',
+    'optimizer': 'Adam',
+    'learning_rate' : 0.0002
 }
 
-
-_learning_rate = .0002
-_optimizers = {
-    'Adam':keras.optimizers.legacy.Adam(learning_rate=_learning_rate,beta_1=0.5),
-    'SGD':keras.optimizers.legacy.SGD(learning_rate=_learning_rate),
-    'RMSprop':keras.optimizers.legacy.RMSprop(learning_rate=_learning_rate),
-    'Adadelta':keras.optimizers.legacy.Adadelta(learning_rate=_learning_rate),
-    'Adagrad':keras.optimizers.legacy.Adagrad(learning_rate=_learning_rate),
-    'Adamax':keras.optimizers.legacy.Adamax(learning_rate=_learning_rate),
-    'Nadam':keras.optimizers.legacy.Nadam(learning_rate=_learning_rate),
-    'Ftrl':keras.optimizers.legacy.Ftrl(learning_rate=_learning_rate)
-}
 
 _losses = {
-    'MeanSquaredError' : keras.losses.MeanSquaredError(),
-    'Huber' :keras.losses.Huber(),
-    'BinaryCrossentropy' :keras.losses.BinaryCrossentropy(from_logits=True),
+    'MeanSquaredError' : keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE),
+    'Huber' :keras.losses.Huber(reduction=keras.losses.Reduction.NONE),
 }
 
 class _Prior():
-	def __init__(self,latent_dim):
-		self.latent_dim = latent_dim
+    def __init__(self,latent_dim):
+        self.latent_dim = latent_dim
 
-	def __call__(self,shape):
-		pass
+    def __call__(self,shape):
+        pass
 
 class _PriorNormal(_Prior):
-	@tf.function
-	def __call__(self,shape):
-		return tf.random.normal(shape=(*shape,self.latent_dim))
-    
+    @tf.function
+    def __call__(self,shape):
+        return tf.random.normal(shape=(*shape,self.latent_dim))
+
 class _PriorUniform(_Prior):
-	@tf.function
-	def __call__(self,shape):
-		return tf.random.uniform(shape=(*shape,self.latent_dim))
-    
+    @tf.function
+    def __call__(self,shape):
+        return tf.random.uniform(shape=(*shape,self.latent_dim))
+
 class _PriorImage(_Prior):
-	def __init__(self,latent_dim,file):
-		super().__init__(latent_dim)
-		img = np.array(PIL.Image.open(file),dtype=np.float64)
-		if len(img.shape) == 3:
-			img = np.sum(img,axis=2)
+    def __init__(self,latent_dim,file):
+        super().__init__(latent_dim)
+        img = np.array(PIL.Image.open(file),dtype=np.float64)
+        if len(img.shape) == 3:
+            img = np.sum(img,axis=2)
 
-		assert len(img.shape) == 2 and latent_dim == 2
+        assert len(img.shape) == 2 and latent_dim == 2
 
-		img /= np.sum(img)
-		self.shape = img.shape
-		self.flat = tf.convert_to_tensor(np.cumsum(img.flatten()).astype(np.float32))
-	
-	@tf.function
-	def __call__(self,shape):
-		u = tf.random.uniform(shape=shape)
-		b = tf.broadcast_to(self.flat,u.shape[:-1]+self.flat.shape)
-		flati = tf.searchsorted(b,u)
-		x = tf.cast(flati % self.shape[1],tf.float32)
-		x += tf.random.uniform(x.shape)
-		y = tf.cast(flati // self.shape[1],tf.float32)
-		y += tf.random.uniform(y.shape)
-		x /= self.shape[1]
-		y = 1. - y/self.shape[0]
-		return tf.stack([x,y],axis=-1)
+        img /= np.sum(img)
+        self.shape = img.shape
+        self.flat = tf.convert_to_tensor(np.cumsum(img.flatten()).astype(np.float32))
+
+    @tf.function
+    def __call__(self,shape):
+        u = tf.random.uniform(shape=shape)
+        b = tf.broadcast_to(self.flat,u.shape[:-1]+self.flat.shape)
+        flati = tf.searchsorted(b,u)
+        x = tf.cast(flati % self.shape[1],tf.float32)
+        x += tf.random.uniform(x.shape)
+        y = tf.cast(flati // self.shape[1],tf.float32)
+        y += tf.random.uniform(y.shape)
+        x /= self.shape[1]
+        y = 1. - y/self.shape[0]
+        return tf.stack([x,y],axis=-1)
+
+
+_random_init = keras.initializers.GlorotUniform(seed=42)
+
+class _SparseConstraint(keras.constraints.Constraint):
+    def __init__(self,left,right):
+        assert len(left) == len(right)
+        mask = np.zeros((np.sum(left),np.sum(right)),dtype=np.float32)
+        idxl = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(left)))
+        idxr = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(right)))
+        for mod in range(len(left)):
+            mask[idxl[mod]:idxl[mod+1],idxr[mod]:idxr[mod+1]] = 1.
+
+        self.mask = tf.convert_to_tensor(mask)
+
+    @tf.function	
+    def __call__(self,w):
+        return w * self.mask
+
+class _SparseInitializer(keras.initializers.Initializer):
+    def __init__(self,left,right):
+        assert len(left) == len(right)
+        self.left = left
+        self.right = right
+        self.idxl = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(left)))
+        self.idxr = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(right)))
+
+    def __call__(self,shape,dtype=None):
+#		print(shape,self.left,self.right)
+        assert shape == [np.sum(self.left),np.sum(self.right)]
+
+        init = np.zeros((np.sum(self.left),np.sum(self.right)),dtype=dtype.as_numpy_dtype)
+        for mod in range(len(self.left)):
+            init[self.idxl[mod]:self.idxl[mod+1],self.idxr[mod]:self.idxr[mod+1]] = _random_init((self.left[mod],self.right[mod])).numpy()
+
+        return tf.convert_to_tensor(init)
+
+
+def _masks(left,right):
+    return { 'kernel_initializer': _SparseInitializer(left,right),
+            'kernel_constraint': _SparseConstraint(left,right) }
 
 
 class AAEModel(keras.models.Model):
-	def __init__(self,molecule_shape,latent_dim=2,prior='normal',hp=_default_hp):
-		super().__init__()
-		self.hp = hp
-		self.latent_dim = latent_dim
-		if prior == 'normal':
-			self.get_prior = _PriorNormal(latent_dim)
-		elif prior == 'uniform':
-			self.get_prior = _PriorUniform(latent_dim)
-		else: 
-			self.get_prior = _PriorImage(latent_dim,prior)
-		
+    def __init__(self,molecule_shape,latent_dim=2,
+            enc_layers=2,enc_seed=64,
+            disc_layers=2,disc_seed=64,
+            prior='normal',hp=_default_hp):
+        super().__init__()
+        
+        self.hp = hp
+        self.latent_dim = latent_dim
+        if prior == 'normal':
+            self.get_prior = _PriorNormal(latent_dim)
+        elif prior == 'uniform':
+            self.get_prior = _PriorUniform(latent_dim)
+        else: 
+            self.get_prior = _PriorImage(latent_dim,prior)
 
-		self.enc = _build_encoder(molecule_shape,latent_dim,hp)
-		self.dec = _build_decoder(molecule_shape,latent_dim,hp)
-		self.disc = _build_discriminator(latent_dim,hp)
+            
+        self.enc_seed = enc_seed
+        self.disc_seed = disc_seed
+            
+        if not isinstance(enc_seed,list):
+            enc_seed = [enc_seed]
 
-	def compile(self,optimizer=None,ae_loss=None,disc_loss=None): 
-		super().compile()
-		self.optimizer = _optimizers[optimizer if optimizer else self.hp['optimizer']]
-		self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
-		self.disc_loss_fn = _losses[disc_loss if disc_loss else self.hp['disc_loss_fn']]
+        if not isinstance(disc_seed,list):
+            disc_seed = [disc_seed]
 
-		self.enc.compile(self.optimizer)
-		self.dec.compile(self.optimizer)
-		self.disc.compile(self.optimizer)
+        enc_neurons = np.array([ _compute_number_of_neurons(enc_layers,n) for n in enc_seed ])
+        disc_neurons = np.array([ _compute_number_of_neurons(disc_layers,n) for n in disc_seed ])
 
-	
-	@tf.function	
-	def train_step(self,batch):
-		if isinstance(batch,tuple):
-			batch = batch[0]
+        self.n_models = enc_neurons.shape[0]
+        assert disc_neurons.shape[0] == self.n_models
 
-		batch_size = self.hp['batch_size']
+        inp = keras.Input(shape=molecule_shape)
+        out = inp
 
-# improve AE to reconstruct
-		with tf.GradientTape() as ae_tape:
-			reconstruct = self.dec(self.enc(batch))
-			ae_loss = self.ae_loss_fn(batch,reconstruct)
+        out = keras.layers.Dense(np.sum(enc_neurons[:,0]),activation=hp['activation'],name = 'enc_0')(out)
+        out = keras.layers.BatchNormalization(momentum=0.8,name=f'enc_bn_0')(out)
 
-		enc_dec_weights = self.enc.trainable_weights + self.dec.trainable_weights
-		enc_dec_grads = ae_tape.gradient(ae_loss, enc_dec_weights)
-		self.optimizer.apply_gradients(zip(enc_dec_grads,enc_dec_weights))
-#		grad_vars = self.optimizer.compute_gradients(ae_loss,enc_dec_weights,ae_tape)
-#		self.optimizer.apply_gradients(grad_vars)
+        for num in range(1,enc_neurons.shape[1]):
+            name = f'enc_{num}'
+            out = keras.layers.Dense(np.sum(enc_neurons[:,num]),activation=hp['activation'],
+                                     name = name, **_masks(enc_neurons[:,num-1],enc_neurons[:,num]))(out)
+            out = keras.layers.BatchNormalization(momentum=0.8,name=f'enc_bn_{num}')(out)
 
-# improve discriminator
-		rand_low = self.get_prior((batch_size,))
-		better_low = self.enc(batch)
-		low = tf.concat([rand_low,better_low],axis=0)
+            
+        out = keras.layers.Dense(self.n_models*latent_dim,name='enc_out',
+                                 **_masks(enc_neurons[:,-1],[latent_dim]*self.n_models))(out) 
+        latent = out
 
-		labels = tf.concat([tf.ones((batch_size,1)), tf.zeros((batch_size,1))], axis=0)
-		labels += 0.05 * tf.random.uniform(tf.shape(labels))	# guide
+        out = keras.layers.Dense(np.sum(enc_neurons[:,-1]),activation=hp['activation'],name=f'dec_{enc_neurons.shape[1]}',
+                                 **_masks([latent_dim]*self.n_models,enc_neurons[:,-1]))(out)
+        out = keras.layers.BatchNormalization(momentum=0.8,name=f'dec_bn_{enc_neurons.shape[1]}')(out)
 
-		with tf.GradientTape() as disc_tape:
-			pred = self.disc(low)
-			disc_loss = self.disc_loss_fn(labels,pred)
+        # decoder layers are numbered in reverse so that neuron numbers match with encoder
+        for num in reversed(range(enc_neurons.shape[1]-1)):
+            name = f'dec_{num}'
+            out = keras.layers.Dense(np.sum(enc_neurons[:,num]),activation=hp['activation'],name=name,
+                                     **_masks(enc_neurons[:,num+1],enc_neurons[:,num]))(out)
+            out = keras.layers.BatchNormalization(momentum=0.8,name=f'dec_bn_{num}')(out)
 
-		disc_grads = disc_tape.gradient(disc_loss,self.disc.trainable_weights)
-		self.optimizer.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
+        out = keras.layers.Dense(self.n_models*molecule_shape[0],name='dec_out',activation=hp['activation'],
+                                    **_masks(enc_neurons[:,0],[molecule_shape[0]]*self.n_models))(out)
+        out = keras.layers.Reshape((self.n_models,molecule_shape[0]))(out)
 
-# teach encoder to cheat
-		alltrue = tf.ones((batch_size,1))
+        self.aes = keras.Model(inputs=inp,outputs=[out,latent])
+        self.enc = keras.Model(inputs=inp,outputs=latent)
+        self.dec = keras.Model(inputs=latent,outputs=out)
 
-		with tf.GradientTape() as cheat_tape:
-			cheat = self.disc(self.enc(batch))
-			cheat_loss = self.disc_loss_fn(alltrue,cheat)
+        inp = keras.Input(shape=(latent_dim * self.n_models,))
+        disc = inp
+        disc = keras.layers.Dense(np.sum(disc_neurons[:,0]),name='disc_0',
+                                  **_masks([latent_dim]*self.n_models,disc_neurons[:,0]))(disc)
+        disc = keras.layers.LeakyReLU(alpha=0.2,name=f'disc_relu_{num}')(disc)
 
-		cheat_grads = cheat_tape.gradient(cheat_loss,self.enc.trainable_weights)
-		self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
+        for num in range(1,disc_neurons.shape[1]):
+            name = f'disc_{num}'
+            disc = keras.layers.Dense(np.sum(disc_neurons[:,num]),name=name,
+                                      **_masks(disc_neurons[:,num-1],disc_neurons[:,num]))(disc)
+            disc = keras.layers.LeakyReLU(alpha=0.2,name=f'disc_relu_{num}')(disc)
 
-		return { 'ae_loss' : ae_loss, 'd_loss' : disc_loss }
+        disc = keras.layers.Dense(self.n_models,name='disc_out',
+                                  **_masks(disc_neurons[:,-1],[1]*self.n_models))(disc)
 
-	def summary(self,expand_nested=True):
-		self.enc.summary(expand_nested=expand_nested)
-		self.dec.summary(expand_nested=expand_nested)
-		self.disc.summary(expand_nested=expand_nested)
-	
-	@tf.function
-	def call(self,x,**kwargs):
-		return self.dec(self.enc(x)) 
+        self.disc = keras.Model(inputs=inp,outputs=disc)
 
-	@tf.function
-	def call_enc(self,x):
-		return self.enc(x)
+    def compile(self,optimizer=None,ae_loss=None):
+        if optimizer is None:
+            optimizer = self.hp['optimizer']
 
-	@tf.function
-	def call_disc(self,low):
-		return self.disc(low)
-	
+        if isinstance(optimizer,str):
+            optimizer = keras.optimizers.legacy.__dict__[optimizer]
 
-# TODO: image prior
+        super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']))
+        self.ae_weights = self.enc.trainable_weights + self.dec.trainable_weights
+        self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
+
+    @tf.function
+    def train_step(self,batch):
+        if isinstance(batch,tuple):
+            batch = batch[0]
+
+        # multiple models need replicated batch to compute loss simultaneously
+        multibatch = tf.stack([batch]*self.n_models,axis=1)
+
+        #AUTOENCODER
+        with tf.GradientTape() as aetape:
+            reconstruct = self.aes(batch)
+            mse = self.ae_loss_fn(multibatch,reconstruct[0])
+            ae_multiloss = tf.reduce_mean(mse,axis=0)
+            ae_loss = tf.reduce_sum(ae_multiloss)
+            
+        ae_grad = aetape.gradient(ae_loss,self.ae_weights)
+        self.last_ae_grad = ae_grad
+        self.optimizer.apply_gradients(zip(ae_grad,self.ae_weights))
+
+        rand_low = self.get_prior((tf.shape(batch)[0],))
+        rand_low = tf.tile(rand_low,(1,self.n_models))
+
+        # DISCRIMINATOR
+# XXX: Binary crossentropy from logits hardcoded
+        with tf.GradientTape() as dtape:
+            neg_pred = self.disc(reconstruct[1])
+            neg_losses = tf.reduce_mean(neg_pred*tf.random.uniform(tf.shape(neg_pred),1.,1.05),axis=0) 
+            pos_pred = self.disc(rand_low)
+            pos_losses = -tf.reduce_mean(pos_pred*tf.random.uniform(tf.shape(pos_pred),1.,1.05),axis=0)
+            disc_losses = neg_losses + pos_losses
+            disc_loss = tf.reduce_mean(disc_losses)
+
+        disc_grads = dtape.gradient(disc_loss,self.disc.trainable_weights)
+        self.optimizer.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
+
+# dtto
+        # CHEAT DISCRIMINATOR
+        with tf.GradientTape() as ctape:
+            cheat = self.disc(self.enc(batch))
+            cheat_losses = -tf.reduce_mean(cheat*tf.random.uniform(tf.shape(cheat),1.,1.05),axis=0)
+            cheat_loss = tf.reduce_mean(cheat_losses)
+
+        cheat_grads = ctape.gradient(cheat_loss,self.enc.trainable_weights)
+        self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
+
+        return {
+            'AE loss min' : tf.reduce_min(ae_multiloss),
+            'AE loss max' : tf.reduce_max(ae_multiloss),
+            'disc loss min' : tf.reduce_min(disc_losses),
+            'disc loss max' : tf.reduce_max(disc_losses),
+            'cheat loss min' : tf.reduce_min(cheat_losses),
+            'cheat loss max' : tf.reduce_max(cheat_losses)
+            }
+
+
+    def summary(self,expand_nested=True):
+        self.aes.summary(expand_nested=expand_nested)
+        self.disc.summary(expand_nested=expand_nested)
+
+    @tf.function
+    def call(self,x,**kwargs):
+        return self.dec(self.enc(x)) 
+
+    @tf.function
+    def call_enc(self,x):
+        return self.enc(x)
+
+    @tf.function
+    def call_disc(self,low):
+        return self.disc(low)
+
+
 # TODO: early stopping
 # TODO: visualization 
 
-if __name__ == '__main__':
-	model = AAEModel((1234,))
-	model.summary(True)
+# if __name__ == '__main__':
+#     model = AAEModel((1234,))
+#     model.summary(True)
+

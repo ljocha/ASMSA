@@ -22,7 +22,7 @@ p.add_argument('--ndx')
 p.add_argument('--output')
 p.add_argument('--trials')
 p.add_argument('--epochs')
-p.add_argument('--hpfunc')
+p.add_argument('--hp')
 p.add_argument('--id')
 p.add_argument('--master')
 
@@ -39,8 +39,8 @@ tuner_id = a.id if a.id else os.environ['HOSTNAME']
 
 assert (tuner_id != 'chief' or output)
 
-with open(a.hpfunc,'rb') as p:
-	hpfunc = dill.load(p)
+with open(a.hp,'rb') as p:
+	hp = dill.load(p)
 
 os.environ['KERASTUNER_TUNER_ID'] = tuner_id
 os.environ['KERASTUNER_ORACLE_IP'] = a.master.split(':')[0]
@@ -100,7 +100,7 @@ def tiny_hp(hp):
 
 tuner = keras_tuner.RandomSearch(
 	max_trials=trials,
-	hypermodel=asmsa.AAEHyperModel((X_train.shape[1],),hpfunc=hpfunc),
+	hypermodel=asmsa.AAEHyperModel((X_train.shape[1],),hp=hp),
 	objective=keras_tuner.Objective("score", direction="min"),
 	directory="./results",
 	project_name=tuner_id,
@@ -108,13 +108,5 @@ tuner = keras_tuner.RandomSearch(
 )
 
 tuner.search(X_train,epochs=epochs)
-
-if tuner_id == 'chief':
-	with open(output,'w') as of:
-		of.write('[\n')
-		for b in tuner.get_best_hyperparameters(num_trials=trials):
-			of.write('	'+str(b.values)+',\n')
-
-		of.write(']\n')
 
 print(f"{tuner_id}: Done!")
