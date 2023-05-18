@@ -62,7 +62,7 @@ def _KLdivergence(x, y):
     return -np.log(r/s).sum() * d / n + np.log(m / (n - 1.))
 
 
-class _KLGatherCallback(keras.callbacks.Callback):
+class _LogCallback(keras.callbacks.Callback):
     def __init__(self,model,valdata,tuning_threshold):
         super().__init__()
         self.set_model(model)
@@ -157,9 +157,8 @@ class _KLGatherCallback(keras.callbacks.Callback):
 
 class AAEHyperModel(kt.HyperModel):
 
-    def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior='normal',hpfunc=None):
+    def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior='normal',hp=None):
         super().__init__()
-        hp = hpfunc
         assert hp
         self.keras_hp = {}
 
@@ -202,15 +201,14 @@ class AAEHyperModel(kt.HyperModel):
     def fit(self, hp, model, train, validation=None, callbacks=[], **kwargs):
         if validation is None:
             validation = train[::5]		# XXX 
-        klcb = _KLGatherCallback(model,validation,self.tuning_threshold)
-        # logcb = LogCallback(model,1,validation)
+        logcb = _LogCallback(model,validation,self.tuning_threshold)
         train = tf.data.Dataset.from_tensor_slices(train)\
             .cache()\
             .shuffle(2048)\
             .batch(hp['batch_size'],drop_remainder=True)\
             .prefetch(tf.data.experimental.AUTOTUNE)
 
-        super().fit(hp, model, train, callbacks=callbacks + [klcb], **kwargs)
+        super().fit(hp, model, train, callbacks=callbacks + [logcb], **kwargs)
 
-        return klcb.get_metric(self.tuning_threshold)
+        return logcb.get_metric(self.tuning_threshold)
 

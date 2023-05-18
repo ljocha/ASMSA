@@ -7,10 +7,10 @@ import dill
 
 
 class TuneWrapper:
-    def __init__(self, epochs=200, trials=80, hpfunc=None, port=8889, image=None, pvc=None, output='best.txt', pdb=None, xtc=None, top=None, ndx=None):
+    def __init__(self, epochs=200, trials=80, hp=None, port=8889, image=None, pvc=None, output='best.txt', pdb=None, xtc=None, top=None, ndx=None):
         self.epochs = epochs
         self.trials = trials
-        self.hpfunc = hpfunc
+        self.hp = hp
         self.port = port
         self.slaves = 10
         if image is None:
@@ -27,10 +27,10 @@ class TuneWrapper:
 
 
     def master_start(self):
-        with open('hpfunc.dill','wb') as d:
-            dill.dump(self.hpfunc,d)
+        with open('hp.dill','wb') as d:
+            dill.dump(self.hp,d)
 
-        os.system(f"nohup tuning.py --output best.txt --pdb {self.pdb} --xtc {self.xtc} --top {self.top} --ndx {self.ndx} --master 0.0.0.0:{self.port} --id chief --epochs {self.epochs} --trials {self.trials} --hpfunc hpfunc.dill >master.out 2>master.err &")
+        os.system(f"nohup tuning.py --output best.txt --pdb {self.pdb} --xtc {self.xtc} --top {self.top} --ndx {self.ndx} --master 0.0.0.0:{self.port} --id chief --epochs {self.epochs} --trials {self.trials} --hp hp.dill >master.out 2>master.err &")
 
     def master_status(self):
         with os.popen('ps axww | grep tuning.py | egrep -v "ps axww|grep"') as p,\
@@ -83,7 +83,7 @@ spec:
         persistentVolumeClaim:
           claimName: {pvc}
 """
-        command=['/usr/local/bin/tuning.sh','--pdb',self.pdb,'--xtc',self.xtc,'--top',self.top,'--ndx',self.ndx,'--master',master+':'+str(self.port),'--epochs',str(self.epochs),'--hpfunc','hpfunc.dill']
+        command=['/usr/local/bin/tuning.sh','--pdb',self.pdb,'--xtc',self.xtc,'--top',self.top,'--ndx',self.ndx,'--master',master+':'+str(self.port),'--epochs',str(self.epochs),'--hp','hp.dill']
 
         k8s.config.load_incluster_config()
         namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()

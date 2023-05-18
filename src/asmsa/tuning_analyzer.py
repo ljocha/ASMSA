@@ -43,7 +43,9 @@ class TuningAnalyzer():
 
 
     #visualize trials in terms of trial_id and order
-    def visualize_tuning(self, trial=0, num_trials=10):
+    def visualize_tuning(self, trial=None, num_trials=10):
+        if trial:
+            num_trials=len(self.sorted_trials)
         # populate x axis with number of epochs from first model of first trial
         first_model = list(self.sorted_trials[0]['results'].items())[0][0]
         num_epochs = len(self.sorted_trials[0]['results'][first_model]['ae_loss'])
@@ -54,14 +56,17 @@ class TuningAnalyzer():
             if i == num_trials:
                 break
 
-            trial = self.sorted_trials[i]
-            print(f'Trial ID: {trial["trial_id"]}')
-            for k,v in trial['results'].items():
+            _trial = self.sorted_trials[i]
+            if trial and trial != _trial["trial_id"]:
+                continue
+
+            print(f'Trial ID: {_trial["trial_id"]}')
+            for k,v in _trial['results'].items():
                 for plot, measure in [(311,'ae_loss'), (312,'dn_loss'), (313,'kl_div')]:
                     plt.subplot(plot)
-                    plt.plot(x, trial['results'][k][measure], label=k)
+                    plt.plot(x, _trial['results'][k][measure], label=k)
                     plt.ylabel(measure)
-                    plt.ylim([0,max(trial['results'][k][measure])])
+                    plt.ylim([0,max(_trial['results'][k][measure])])
                     plt.autoscale()
                     if plot != 313:
                         plt.xticks([])
