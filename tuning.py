@@ -19,7 +19,6 @@ p.add_argument('--pdb')
 p.add_argument('--xtc')
 p.add_argument('--top')
 p.add_argument('--ndx')
-p.add_argument('--output')
 p.add_argument('--trials')
 p.add_argument('--epochs')
 p.add_argument('--hp')
@@ -32,12 +31,9 @@ conf = a.pdb
 traj = a.xtc
 topol = a.top
 index = a.ndx
-output = a.output
 trials = int(a.trials) if a.trials else 42
 epochs = int(a.epochs) if a.epochs else 7
 tuner_id = a.id if a.id else os.environ['HOSTNAME']
-
-assert (tuner_id != 'chief' or output)
 
 with open(a.hp,'rb') as p:
 	hp = dill.load(p)

@@ -1,4 +1,4 @@
-FROM python:3.9-slim as builder
+FROM python:3.8-slim as builder
 
 ARG DIST=asmsa-0.0.1.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive 
@@ -27,7 +27,6 @@ RUN wget https://raw.githubusercontent.com/tensorflow/tensorboard/e59ca8d45746f4
 
 RUN useradd -m -u 1000 jovyan
 RUN mkdir -p /opt && chown jovyan /opt
-USER jovyan
 
 COPY --from=builder /opt /opt
 COPY --from=builder /usr/local /usr/local
@@ -38,10 +37,13 @@ RUN apt update && apt install -y curl && curl -LO "https://dl.k8s.io/release/$(c
 USER jovyan
 
 RUN mkdir /opt/ASMSA
-COPY IMAGE prepare.ipynb tune.ipynb train.ipynb md.ipynb tune_demo.ipynb /opt/ASMSA/
+COPY IMAGE prepare.ipynb tune.ipynb train.ipynb md.ipynb /opt/ASMSA/
 COPY md.mdp.template *.mdp /opt/ASMSA/
 COPY tuning.py tuning.sh start-notebook.sh /usr/local/bin/
 WORKDIR /home/jovyan
+
+# use tensorflow from base image
+ENV PYTHONPATH="/usr/local/lib/python3.8/dist-packages/"
 
 ENTRYPOINT ["tini", "-g", "--"]
 CMD ["start-notebook.sh"]
