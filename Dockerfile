@@ -12,7 +12,6 @@ RUN python -m venv .
 COPY requirements.txt /tmp/requirements.txt
 RUN . bin/activate && pip install -r /tmp/requirements.txt
 RUN . bin/activate && pip install git+https://github.com/onnx/tensorflow-onnx 
-RUN . bin/activate && jupyter-nbextension enable nglview --py 
 
 COPY dist/$DIST /tmp
 RUN . bin/activate && pip3 install /tmp/$DIST 
@@ -22,16 +21,17 @@ FROM tensorflow/tensorflow:latest-gpu
 
 RUN apt update && apt install -y wget g++ libz-dev tini procps && apt clean && rm -rf /var/lib/apt/lists/*
 
-# apply tensorboard fix
-RUN wget https://raw.githubusercontent.com/tensorflow/tensorboard/e59ca8d45746f459d797f4e69377eda4433e1624/tensorboard/notebook.py -O - > /usr/local/lib/python3.8/dist-packages/tensorboard/notebook.py 
-
 RUN useradd -m -u 1000 jovyan
 RUN mkdir -p /opt && chown jovyan /opt
 
 COPY --from=builder /opt /opt
 COPY --from=builder /usr/local /usr/local
 
-USER root
+# apply tensorboard fix
+RUN wget https://raw.githubusercontent.com/tensorflow/tensorboard/e59ca8d45746f459d797f4e69377eda4433e1624/tensorboard/notebook.py -O - > /usr/local/lib/python3.8/dist-packages/tensorboard/notebook.py 
+
+RUN . /opt/bin/activate && jupyter labextension enable nglview 
+
 RUN apt update && apt install -y curl && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && install -m 755 kubectl /usr/local/bin && apt clean && rm -rf /var/lib/apt/lists/*
 
 USER jovyan

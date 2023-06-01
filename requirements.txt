@@ -4,10 +4,10 @@ torch==1.12.1
 torchvision==0.13.1
 mdtraj
 keras_tuner
-jupyterhub
 jupyterlab
+jupyterhub
 matplotlib
-ipywidgets<8
+ipywidgets
 nglview
 networkx
 sympy 
