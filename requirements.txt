@@ -6,6 +6,7 @@ mdtraj
 keras_tuner
 jupyterlab
 jupyterhub
+scikit-learn
 matplotlib
 ipywidgets
 nglview
