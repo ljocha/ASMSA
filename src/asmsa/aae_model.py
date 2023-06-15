@@ -228,7 +228,7 @@ class AAEModel(keras.models.Model):
         self.last_ae_grad = ae_grad
         self.optimizer.apply_gradients(zip(ae_grad,self.ae_weights))
 
-        rand_low = self.get_prior((tf.shape(batch)[0],))
+        rand_low = self.get_prior((batch.shape[0],))
         rand_low = tf.tile(rand_low,(1,self.n_models))
 
         # DISCRIMINATOR
