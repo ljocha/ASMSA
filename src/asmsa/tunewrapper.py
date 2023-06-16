@@ -7,7 +7,7 @@ import dill
 
 
 class TuneWrapper:
-    def __init__(self, epochs=200, trials=80, hp=None, port=8889, image=None, pvc=None, output='best.txt', pdb=None, xtc=None, top=None, ndx=None):
+    def __init__(self, ds=None, epochs=200, trials=80, hp=None, port=8889, image=None, pvc=None, output='default', pdb=None, xtc=None, top=None, ndx=None):
         self.epochs = epochs
         self.trials = trials
         self.hp = hp
@@ -24,13 +24,17 @@ class TuneWrapper:
         self.xtc = xtc
         self.top = top
         self.ndx = ndx
+        self.ds = ds
 
 
     def master_start(self):
         with open('hp.dill','wb') as d:
             dill.dump(self.hp,d)
 
-        os.system(f"nohup tuning.py --output best.txt --pdb {self.pdb} --xtc {self.xtc} --top {self.top} --ndx {self.ndx} --master 0.0.0.0:{self.port} --id chief --epochs {self.epochs} --trials {self.trials} --hp hp.dill >master.out 2>master.err &")
+        with open('ds.dill','wb') as d:
+            dill.dump(self.ds,d)
+        
+        os.system(f"nohup tuning.py --ds ds.dill --pdb {self.pdb} --xtc {self.xtc} --top {self.top} --ndx {self.ndx} --master 0.0.0.0:{self.port} --id chief --epochs {self.epochs} --trials {self.trials} --hp hp.dill >master.out 2>master.err &")
 
     def master_status(self):
         with os.popen('ps axww | grep tuning.py | egrep -v "ps axww|grep"') as p,\
@@ -54,6 +58,8 @@ spec:
   parallelism: {slaves}
   template:
     spec:
+      restartPolicy: Never                                                                                                                                     33,37         Top
+    spec:
       restartPolicy: Never
       containers:
       - name: {name}
@@ -66,8 +72,8 @@ spec:
         env:
         - name: 'OMP_NUM_THREADS'
           value: '4'
-        - name: 'START_TIME'
-          value: {start_time}
+        - name: 'RESULTS_DIR'
+          value: {results_dir}
         resources:
           requests:
             cpu: '4'
@@ -87,7 +93,7 @@ spec:
 
         k8s.config.load_incluster_config()
         namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
-        job=job_template.format(name='tuner', image=self.image, command=command, pvc=self.pvc,slaves=slaves,start_time=datetime.today().strftime("%m%d%Y-%H%M%S"))
+        job=job_template.format(name='tuner', image=self.image, command=command, pvc=self.pvc,slaves=slaves,results_dir=self.output)
         batch_api = k8s.client.BatchV1Api()
         with open('job.yml','w') as jf:
             jf.write(job)
@@ -96,5 +102,3 @@ spec:
 
     def workers_status(self):
         os.system('kubectl get pods | grep ^tuner-')
-
-

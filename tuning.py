@@ -24,6 +24,7 @@ p.add_argument('--epochs')
 p.add_argument('--hp')
 p.add_argument('--id')
 p.add_argument('--master')
+p.add_argument('--ds')
 
 a = p.parse_args()
 
@@ -42,16 +43,22 @@ os.environ['KERASTUNER_TUNER_ID'] = tuner_id
 os.environ['KERASTUNER_ORACLE_IP'] = a.master.split(':')[0]
 os.environ['KERASTUNER_ORACLE_PORT'] = a.master.split(':')[1]
 
-tr = md.load(traj,top=conf)
-idx=tr[0].top.select("name CA")
-tr.superpose(tr[0],atom_indices=idx)
-geom = np.moveaxis(tr.xyz ,0,-1)
-
-density = 2 # integer in [1, n_atoms-1]
-sparse_dists = asmsa.NBDistancesSparse(geom.shape[0], density=density)
-mol = asmsa.Molecule(pdb=conf,top=topol,ndx=index,fms=[sparse_dists])
-
-X_train = mol.intcoord(geom).T
+if a.ds:
+    print('Using selected dataset...')
+    with open(a.ds,'rb') as p:
+    	ds = dill.load(p)
+    X_validate = ds
+else:
+    tr = md.load(traj,top=conf)
+    idx=tr[0].top.select("name CA")
+    tr.superpose(tr[0],atom_indices=idx)
+    geom = np.moveaxis(tr.xyz ,0,-1)
+    
+    density = 2 # integer in [1, n_atoms-1]
+    sparse_dists = asmsa.NBDistancesSparse(geom.shape[0], density=density)
+    mol = asmsa.Molecule(pdb=conf,top=topol,ndx=index,fms=[sparse_dists])
+    
+    X_validate = mol.intcoord(geom).T
 
 def full_hp(hp):
     return {
@@ -96,13 +103,14 @@ def tiny_hp(hp):
 
 tuner = keras_tuner.RandomSearch(
 	max_trials=trials,
-	hypermodel=asmsa.AAEHyperModel((X_train.shape[1],),hp=hp),
+	hypermodel=asmsa.AAEHyperModel((X_validate.shape[1],),hp=hp),
 	objective=keras_tuner.Objective("score", direction="min"),
 	directory="./results",
 	project_name=tuner_id,
 	overwrite=True
 )
 
-tuner.search(X_train,epochs=epochs)
+tuner.search(X_validate,epochs=epochs)
 
 print(f"{tuner_id}: Done!")
+
