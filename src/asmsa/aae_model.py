@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 import PIL
+import tensorflow_probability as tfp
 
 def _compute_number_of_neurons(layers,seed):
     neurons = [seed]
@@ -35,15 +36,16 @@ class _Prior():
     def __call__(self,shape):
         pass
 
-class _PriorNormal(_Prior):
+class _PriorDistribution(_Prior):
+    def __init__(self,latent_dim,prior):
+        super().__init__(latent_dim)
+        self.prior = prior
+    
     @tf.function
     def __call__(self,shape):
-        return tf.random.normal(shape=(*shape,self.latent_dim))
-
-class _PriorUniform(_Prior):
-    @tf.function
-    def __call__(self,shape):
-        return tf.random.uniform(shape=(*shape,self.latent_dim))
+        return tfp.distributions.Sample(
+            self.prior,
+            sample_shape=(*shape,self.latent_dim)).sample()
 
 class _PriorImage(_Prior):
     def __init__(self,latent_dim,file):
@@ -117,15 +119,13 @@ class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
             enc_layers=2,enc_seed=64,
             disc_layers=2,disc_seed=64,
-            prior='normal',hp=_default_hp):
+            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp):
         super().__init__()
         
         self.hp = hp
         self.latent_dim = latent_dim
-        if prior == 'normal':
-            self.get_prior = _PriorNormal(latent_dim)
-        elif prior == 'uniform':
-            self.get_prior = _PriorUniform(latent_dim)
+        if isinstance(prior,tfp.distributions.Distribution):
+            self.get_prior = _PriorDistribution(latent_dim,prior)
         else: 
             self.get_prior = _PriorImage(latent_dim,prior)
 
@@ -279,12 +279,3 @@ class AAEModel(keras.models.Model):
     @tf.function
     def call_disc(self,low):
         return self.disc(low)
-
-
-# TODO: early stopping
-# TODO: visualization 
-
-# if __name__ == '__main__':
-#     model = AAEModel((1234,))
-#     model.summary(True)
-
