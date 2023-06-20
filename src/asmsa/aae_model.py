@@ -43,9 +43,14 @@ class _PriorDistribution(_Prior):
     
     @tf.function
     def __call__(self,shape):
-        return tfp.distributions.Sample(
+        sample = tfp.distributions.Sample(
             self.prior,
             sample_shape=(*shape,self.latent_dim)).sample()
+
+        if len(sample.shape) > 2:
+            sample = tf.reshape(sample,[sample.shape[0]*sample.shape[1],self.latent_dim])
+            
+        return sample
 
 class _PriorImage(_Prior):
     def __init__(self,latent_dim,file):
