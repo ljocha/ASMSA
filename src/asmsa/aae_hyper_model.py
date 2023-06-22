@@ -3,6 +3,7 @@ import keras_tuner as kt
 import numpy as np
 from tensorflow import keras
 import tensorflow as tf
+import tensorflow_probability as tfp
 import pickle
 from datetime import datetime
 import dict_hash 
@@ -90,7 +91,7 @@ class _LogCallback(keras.callbacks.Callback):
     def on_train_end(self,epoch,logs=None):
         self.d['score'] = self.get_metric(self.tuning_threshold)
         workdir = os.environ['PWD']
-        tuning_path = f'{workdir}/ASMSA_visualization/{os.environ["START_TIME"]}'
+        tuning_path = f'{workdir}/analysis/{os.environ["RESULTS_DIR"]}'
         
         Path(tuning_path).mkdir(parents=True, exist_ok=True)
         obj = f"{tuning_path}/{self.trial_id}"
@@ -115,7 +116,7 @@ class _LogCallback(keras.callbacks.Callback):
         mse = self.model.ae_loss_fn(self.multibatch,reconstruct[0])
         ae_multiloss = tf.reduce_mean(mse,axis=0)
 
-        rand_low = self.model.get_prior((tf.shape(self.valdata)[0],))
+        rand_low = self.model.get_prior((self.valdata.shape[0],))
         rand_low = tf.tile(rand_low,(1,self.model.n_models))
 
         # compute discriminator loss
@@ -157,7 +158,7 @@ class _LogCallback(keras.callbacks.Callback):
 
 class AAEHyperModel(kt.HyperModel):
 
-    def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior='normal',hp=None):
+    def __init__(self,molecule_shape,latent_dim=2,tuning_threshold=.25,prior=tfp.distributions.Normal(loc=0, scale=1),hp=None):
         super().__init__()
         assert hp
         self.keras_hp = {}
