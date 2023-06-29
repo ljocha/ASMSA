@@ -40,6 +40,11 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      securityContext: # Pod security context
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: {self.name}
         image: {self.image}
@@ -48,6 +53,10 @@ spec:
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         env:
         - name: 'OMP_NUM_THREADS'
           value: '{cores}'
