@@ -6,9 +6,10 @@ import os
 import time
 
 class GMX:
-	def __init__(self,pvc=None,image='ljocha/gromacs:2023-1'):
+	def __init__(self,pvc=None,image='ljocha/gromacs:2023-1',workdir='ASMSA'):
 		self.pvc = pvc
 		self.name = None
+		self.workdir = workdir
 		self.ns = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 		self.image = image
 		k8s.config.load_incluster_config()
@@ -39,14 +40,23 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      securityContext: # Pod security context
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: {self.name}
         image: {self.image}
-        workingDir: /mnt/ASMSA
+        workingDir: /mnt/{self.workdir}
         command: {kcmd}
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         env:
         - name: 'OMP_NUM_THREADS'
           value: '{cores}'
@@ -96,9 +106,12 @@ spec:
 		return None
 		
 	def log(self, tail=None):
+		out = None
 		if self.name:
-			if tail:
-				os.system(f"kubectl logs job/{self.name} | tail -{tail}")
-			else:
-				os.system(f"kubectl logs job/{self.name}")
-		return None
+			with os.popen(f"kubectl logs job/{self.name}") as p:
+				if tail:
+					out = ''.join(p.readlines()[:-tail])
+				else:
+					out = ''.join(p.readlines())
+
+		return out
