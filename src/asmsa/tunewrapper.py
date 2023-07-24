@@ -33,7 +33,7 @@ class TuneWrapper:
 
         with open('ds.dill','wb') as d:
             dill.dump(self.ds,d)
-        
+
         os.system(f"nohup tuning.py --ds ds.dill --pdb {self.pdb} --xtc {self.xtc} --top {self.top} --ndx {self.ndx} --master 0.0.0.0:{self.port} --id chief --epochs {self.epochs} --trials {self.trials} --hp hp.dill >master.out 2>master.err &")
 
     def master_status(self):
@@ -58,15 +58,22 @@ spec:
   parallelism: {slaves}
   template:
     spec:
-      restartPolicy: Never                                                                                                                                     33,37         Top
-    spec:
       restartPolicy: Never
+      securityContext: # Pod security context
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: {name}
         image: {image}
         workingDir: /mnt/ASMSA
         command: {command}
         securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
           runAsUser: 1000
           runAsGroup: 1000
         env:
