@@ -10,7 +10,7 @@ scikit-learn
 tensorflow-probability
 matplotlib
 ipywidgets
-nglview
+nglview==3.0.5
 networkx
 sympy
 onnx2torch
