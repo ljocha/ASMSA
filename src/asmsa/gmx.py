@@ -6,7 +6,7 @@ import os
 import time
 
 class GMX:
-    def __init__(self,pvc=None,image='spectraes/gpd:11',workdir='ASMSA'):
+    def __init__(self,pvc=None,image='spectraes/gpd:12',workdir='ASMSA'):
         self.pvc = pvc
         self.name = None
         self.workdir = workdir
@@ -16,7 +16,7 @@ class GMX:
         self.batchapi = k8s.client.BatchV1Api()
         self.coreapi = k8s.client.CoreV1Api()
 
-    def start(self,cmd,input=None,gpus=0,cores=1,mem=4,wait=False,delete=False,tail=0,scratchdir=False):
+    def start(self,cmd,input=None,gpus=0,cores=1,mem=4,wait=False,delete=False,tail=0,scratchdir=None):
 
         if self.name:
             raise RuntimeError(f"job {self.name} already running, delete() it first")
@@ -29,10 +29,12 @@ class GMX:
             cmd += f' <<<"{input}"'
 
         _scratchdir = ''
-        if scratchdir == True:
+        if (scratchdir == None and cmd.split(' ')[0] == 'mdrun') or scratchdir == True:
             _scratchdir = '/tmp'
         elif isinstance(scratchdir,str):
             _scratchdir = scratchdir
+        elif scratchdir == False:
+            _scratchdir = ''
 
         kcmd = ['bash', '-c', 'gmx ' + cmd]
 
