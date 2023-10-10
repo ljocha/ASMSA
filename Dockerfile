@@ -1,4 +1,4 @@
-FROM python:3.8-slim as builder
+FROM python:3.8-slim-bullseye as builder
 
 ARG DIST=asmsa-0.0.1.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive 
@@ -17,7 +17,7 @@ COPY dist/$DIST /tmp
 RUN . bin/activate && pip3 install /tmp/$DIST 
 
 # select tensorflow gpu image as base
-FROM tensorflow/tensorflow:latest-gpu 
+FROM tensorflow/tensorflow:2.13.0-gpu 
 
 RUN apt update && apt install -y wget g++ libz-dev tini procps && apt clean && rm -rf /var/lib/apt/lists/*
 
@@ -28,7 +28,9 @@ COPY --from=builder /opt /opt
 COPY --from=builder /usr/local /usr/local
 
 # apply tensorboard fix
-RUN wget https://raw.githubusercontent.com/tensorflow/tensorboard/e59ca8d45746f459d797f4e69377eda4433e1624/tensorboard/notebook.py -O - > /usr/local/lib/python3.8/dist-packages/tensorboard/notebook.py 
+#RUN wget https://raw.githubusercontent.com/tensorflow/tensorboard/e59ca8d45746f459d797f4e69377eda4433e1624/tensorboard/notebook.py -O - > /usr/local/lib/python3.8/dist-packages/tensorboard/notebook.py 
+COPY 3142.patch /tmp
+RUN . /opt/bin/activate && cd /usr/local/lib/python$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")/dist-packages && patch -p1 </tmp/3142.patch
 
 RUN . /opt/bin/activate && jupyter labextension enable nglview 
 
