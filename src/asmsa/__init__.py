@@ -13,9 +13,6 @@ from .mol_model import MoleculeModel, NBDistancesSparse, NBDistancesDense
 from .aae_model import AAEModel
 from .aae_hyper_model import AAEHyperModel
 
-from .gmx import GMX
-
-
 
 def _parse_top(top,ndx = None):
 	anums = []

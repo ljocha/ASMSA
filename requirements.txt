@@ -2,15 +2,15 @@ dict_hash
 jupyter-server-proxy
 torch==1.12.1
 torchvision==0.13.1
-mdtraj==1.9.6
+mdtraj
 keras_tuner
 jupyterlab
 jupyterhub
 scikit-learn
 tensorflow-probability
 matplotlib
-ipywidgets
-nglview==3.0.5
+# ipywidgets
+nglview
 networkx
 sympy
 onnx2torch
