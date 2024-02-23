@@ -26,7 +26,7 @@ COPY md.mdp.template *.mdp /opt/ASMSA/
 COPY tuning.py tuning.sh start-notebook.sh /usr/local/bin/
 # WORKDIR /home/jovyan
 
-COPY gmx-wrap2.sh /usr/local/bin/gmx
+COPY --chown=jovyan gmx-wrap2.sh /usr/local/bin/gmx
 RUN mkdir /tmp/asmsa
 COPY --chown=jovyan README.md setup.cfg pyproject.toml /tmp/asmsa/
 COPY --chown=jovyan src /tmp/asmsa/src
