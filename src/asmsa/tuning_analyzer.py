@@ -10,7 +10,7 @@ from pickle import UnpicklingError
 class TuningAnalyzer():
     def __init__(self,tuning=None):
         # get latest tuning dir or the one selected by user
-        self.tuning_dir = max(glob.glob(os.path.join(f'{os.environ["PWD"]}/analysis', '*/')), key=os.path.getmtime) if tuning==None else tuning
+        self.tuning_dir = max(glob.glob(os.path.join(f'{os.getcwd()}/analysis', '*/')), key=os.path.getmtime) if tuning==None else tuning
         self.sorted_trials = self._analyze()
         print(f'Analyzing tuning from: {self.tuning_dir}')
 

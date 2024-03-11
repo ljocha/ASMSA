@@ -90,7 +90,7 @@ class _LogCallback(keras.callbacks.Callback):
         
     def on_train_end(self,epoch,logs=None):
         self.d['score'] = self.get_metric(self.tuning_threshold)
-        workdir = os.environ['PWD']
+        workdir = os.getcwd()
         tuning_path = f'{workdir}/analysis/{os.environ["RESULTS_DIR"]}'
         
         Path(tuning_path).mkdir(parents=True, exist_ok=True)

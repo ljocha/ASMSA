@@ -3,7 +3,9 @@
 #echo $0: "$@" >&2
 #env >&2
 
-img=cerit.io/ljocha/gromacs:2023-2-plumed-2-9-afed-pytorch-model-cv
+img=cerit.io/ljocha/gromacs:2023-2-plumed-2-9-afed-pytorch-model-cv-2
+
+input=$(cat -)
 
 # XXX: cwd root of the volue only
 
@@ -71,8 +73,8 @@ EOF
     done
 
 	kubectl wait --for=condition=ready pod -l job=asmsa-gmx >&2
-	kubectl exec job/asmsa-gmx -- bash -c "$kcmd"
+	kubectl exec job/asmsa-gmx -- bash -c "$kcmd <<<\"$input\""
 else
-	docker run -v $DOCKER_WORKDIR:/work -w /work -u $(id -u) $img gmx "$@"
+	docker run -i --gpus all -v $DOCKER_WORKDIR:/work -w /work -u $(id -u) $img gmx "$@" <<<"$input"
 fi
 
