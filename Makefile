@@ -9,7 +9,7 @@ package-build:
 	python3 -m build
 
 docker-build: 
-	docker build -t ${image} .
+	docker build ${buildopt} -t ${image} .
 	docker tag ${image}:latest ${image}:${tag}
 	docker push ${image}:latest 
 	docker push ${image}:${tag}
