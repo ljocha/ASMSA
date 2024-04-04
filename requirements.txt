@@ -16,4 +16,3 @@ sympy
 onnx2torch
 kubernetes
 dill
-GromacsWrapper
