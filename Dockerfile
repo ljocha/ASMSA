@@ -11,7 +11,10 @@ RUN mkdir /opt/ASMSA && chown -R jovyan /opt/ASMSA
 RUN adduser jovyan docker
 
 USER jovyan
-RUN pip install 'tensorflow[and-cuda]'
+
+# 2.16 is broken with tensorflow_probability <= 0.23, https://github.com/tensorflow/probability/issues/1795
+RUN pip install 'tensorflow[and-cuda]<2.16'
+
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
 RUN pip install git+https://github.com/onnx/tensorflow-onnx 
