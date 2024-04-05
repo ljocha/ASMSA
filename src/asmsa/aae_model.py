@@ -1,4 +1,4 @@
-#! vim: ai ts=4:
+#! vim: ai expandtab ts=4:
 
 import tensorflow as tf
 from tensorflow import keras
@@ -51,6 +51,16 @@ class _PriorDistribution(_Prior):
             sample = tf.reshape(sample,[sample.shape[0]*sample.shape[1],self.latent_dim])
             
         return sample
+
+class _PriorMultivariate(_Prior):
+    def __init__(self,prior):
+        super().__init__(prior.event_shape[0])
+        self.prior = prior
+
+    @tf.function
+    def __call__(self,shape):
+      return self.prior.sample(shape)
+
 
 class _PriorImage(_Prior):
     def __init__(self,latent_dim,file):
@@ -124,16 +134,21 @@ class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
             enc_layers=2,enc_seed=64,
             disc_layers=2,disc_seed=64,
-            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp):
+            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False):
         super().__init__()
         
         self.hp = hp
         self.latent_dim = latent_dim
         if isinstance(prior,tfp.distributions.Distribution):
-            self.get_prior = _PriorDistribution(latent_dim,prior)
+            if len(prior.event_shape) == 0:
+               self.get_prior = _PriorDistribution(latent_dim,prior)
+            else:
+               assert latent_dim == prior.event_shape[0]
+               self.get_prior = _PriorMultivariate(prior)
         else: 
             self.get_prior = _PriorImage(latent_dim,prior)
 
+        self.with_density = with_density
             
         self.enc_seed = enc_seed
         self.disc_seed = disc_seed
@@ -149,6 +164,10 @@ class AAEModel(keras.models.Model):
 
         self.n_models = enc_neurons.shape[0]
         assert disc_neurons.shape[0] == self.n_models
+
+        if with_density:
+          assert self.n_models == 1		# don't bother with multiple models and density together
+          self.prior_max = np.max(prior.prob(prior.sample(10000)))
 
         inp = keras.Input(shape=molecule_shape)
         out = inp
@@ -215,9 +234,11 @@ class AAEModel(keras.models.Model):
         self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
 
     @tf.function
-    def train_step(self,batch):
-        if isinstance(batch,tuple):
-            batch = batch[0]
+    def train_step(self,in_batch):
+        if isinstance(in_batch,tuple):
+            batch = in_batch[0]
+        else:
+            batch = in_batch
 
         # multiple models need replicated batch to compute loss simultaneously
         multibatch = tf.stack([batch]*self.n_models,axis=1)
@@ -259,13 +280,31 @@ class AAEModel(keras.models.Model):
         cheat_grads = ctape.gradient(cheat_loss,self.enc.trainable_weights)
         self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
 
+        # FOLLOW DENSITIES
+        if self.with_density:
+            with tf.GradientTape() as detape:
+                 lows = self.enc(batch)
+                 low_dens = self.get_prior.prior.prob(lows)	# XXX assumes MultivariateNormal, more or less
+                 low_dens /= self.prior_max
+                 dens_loss = keras.losses.kl_divergence(in_batch[1],low_dens)
+
+            dens_grads = detape.gradient(dens_loss,self.enc.trainable_weights)
+            self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
+
+        else:
+            dens_loss = None
+                            
+
+   
+
         return {
             'AE loss min' : tf.reduce_min(ae_multiloss),
             'AE loss max' : tf.reduce_max(ae_multiloss),
             'disc loss min' : tf.reduce_min(disc_losses),
             'disc loss max' : tf.reduce_max(disc_losses),
             'cheat loss min' : tf.reduce_min(cheat_losses),
-            'cheat loss max' : tf.reduce_max(cheat_losses)
+            'cheat loss max' : tf.reduce_max(cheat_losses),
+            'density loss' : dens_loss
             }
 
 
@@ -284,3 +323,4 @@ class AAEModel(keras.models.Model):
     @tf.function
     def call_disc(self,low):
         return self.disc(low)
+
