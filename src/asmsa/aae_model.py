@@ -286,7 +286,8 @@ class AAEModel(keras.models.Model):
                  lows = self.enc(batch)
                  low_dens = self.get_prior.prior.prob(lows)	# XXX assumes MultivariateNormal, more or less
                  low_dens /= self.prior_max
-                 dens_loss = keras.losses.kl_divergence(in_batch[1],low_dens)
+                 #dens_loss = keras.losses.kl_divergence(in_batch[1],low_dens)
+                 dens_loss = keras.losses.mean_squared_error(in_batch[1],low_dens)
 
             dens_grads = detape.gradient(dens_loss,self.enc.trainable_weights)
             self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
