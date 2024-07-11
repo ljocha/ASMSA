@@ -91,8 +91,10 @@ class _PriorImage(_Prior):
 
 _random_init = keras.initializers.GlorotUniform(seed=42)
 
+
 class _SparseConstraint(keras.constraints.Constraint):
     def __init__(self,left,right):
+        super().__init__()
         assert len(left) == len(right)
         mask = np.zeros((np.sum(left),np.sum(right)),dtype=np.float32)
         idxl = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(left)))
@@ -102,12 +104,12 @@ class _SparseConstraint(keras.constraints.Constraint):
 
         self.mask = tf.convert_to_tensor(mask)
 
-    @tf.function	
     def __call__(self,w):
         return w * self.mask
 
 class _SparseInitializer(keras.initializers.Initializer):
     def __init__(self,left,right):
+        super().__init__()
         assert len(left) == len(right)
         self.left = left
         self.right = right
@@ -115,7 +117,6 @@ class _SparseInitializer(keras.initializers.Initializer):
         self.idxr = np.concatenate((np.zeros((1,),dtype=np.int32),np.cumsum(right)))
 
     def __call__(self,shape,dtype=None):
-#		print(shape,self.left,self.right)
         assert list(shape) == [np.sum(self.left),np.sum(self.right)]
 
         init = np.zeros((np.sum(self.left),np.sum(self.right)),dtype=dtype)
@@ -126,7 +127,6 @@ class _SparseInitializer(keras.initializers.Initializer):
 
 
 def _masks(left,right):
-    return {}   # FIXME
     return { 'kernel_initializer': _SparseInitializer(left,right),
             'kernel_constraint': _SparseConstraint(left,right) }
 
