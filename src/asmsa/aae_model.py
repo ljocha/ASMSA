@@ -116,9 +116,9 @@ class _SparseInitializer(keras.initializers.Initializer):
 
     def __call__(self,shape,dtype=None):
 #		print(shape,self.left,self.right)
-        assert shape == [np.sum(self.left),np.sum(self.right)]
+        assert list(shape) == [np.sum(self.left),np.sum(self.right)]
 
-        init = np.zeros((np.sum(self.left),np.sum(self.right)),dtype=dtype.as_numpy_dtype)
+        init = np.zeros((np.sum(self.left),np.sum(self.right)),dtype=dtype)
         for mod in range(len(self.left)):
             init[self.idxl[mod]:self.idxl[mod+1],self.idxr[mod]:self.idxr[mod+1]] = _random_init((self.left[mod],self.right[mod])).numpy()
 
@@ -126,6 +126,7 @@ class _SparseInitializer(keras.initializers.Initializer):
 
 
 def _masks(left,right):
+    return {}   # FIXME
     return { 'kernel_initializer': _SparseInitializer(left,right),
             'kernel_constraint': _SparseConstraint(left,right) }
 
@@ -227,11 +228,15 @@ class AAEModel(keras.models.Model):
             optimizer = self.hp['optimizer']
 
         if isinstance(optimizer,str):
-            optimizer = keras.optimizers.legacy.__dict__[optimizer]
+#            optimizer = keras.optimizers.legacy.__dict__[optimizer]
+            optimizer = keras.optimizers.__dict__[optimizer]
 
         super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']))
         self.ae_weights = self.enc.trainable_weights + self.dec.trainable_weights
+        self.optimizer.build(self.ae_weights + self.disc.trainable_weights)
         self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
+        self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
+
 
     @tf.function
     def train_step(self,in_batch):
@@ -287,7 +292,8 @@ class AAEModel(keras.models.Model):
                  low_dens = self.get_prior.prior.prob(lows)	# XXX assumes MultivariateNormal, more or less
                  low_dens /= self.prior_max
                  #dens_loss = keras.losses.kl_divergence(in_batch[1],low_dens)
-                 dens_loss = keras.losses.mean_squared_error(in_batch[1],low_dens)
+                 #dens_loss = keras.losses.mean_squared_error(in_batch[1],low_dens)
+                 dens_loss = self.dens_loss_fn(in_batch[1],low_dens)
 
             dens_grads = detape.gradient(dens_loss,self.enc.trainable_weights)
             self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
