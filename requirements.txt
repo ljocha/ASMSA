@@ -4,6 +4,7 @@ torch==1.12.1
 torchvision==0.13.1
 mdtraj
 keras_tuner
+tf_keras
 jupyterlab
 jupyterhub
 scikit-learn

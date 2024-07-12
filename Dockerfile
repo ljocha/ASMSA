@@ -13,7 +13,9 @@ RUN adduser jovyan docker
 USER jovyan
 
 # 2.16 is broken with tensorflow_probability <= 0.23, https://github.com/tensorflow/probability/issues/1795
-RUN pip install 'tensorflow[and-cuda]<2.16'
+# RUN pip install 'tensorflow[and-cuda]<2.16'
+
+RUN pip install 'tensorflow[and-cuda]'
 
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
@@ -25,8 +27,9 @@ RUN pip install git+https://github.com/onnx/tensorflow-onnx
 RUN cd /tmp && git clone --single-branch -b k8s https://github.com/ljocha/GromacsWrapper.git && pip install ./GromacsWrapper && rm -rf GromacsWrapper
 
 COPY IMAGE prepare.ipynb tune.ipynb train.ipynb md.ipynb /opt/ASMSA/
-COPY md.mdp.template *.mdp /opt/ASMSA/
-COPY tuning.py tuning.sh start-notebook.sh /usr/local/bin/
+COPY ions.mdp  minim-sol.mdp  npt.mdp  nvt.mdp /opt/ASMSA/
+# COPY tuning.py tuning.sh start-notebook.sh /usr/local/bin/
+COPY start-notebook.sh /usr/local/bin/
 # WORKDIR /home/jovyan
 
 COPY --chown=jovyan gmx-wrap2.sh /usr/local/bin/gmx
