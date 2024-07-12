@@ -299,7 +299,7 @@ class AAEModel(keras.models.Model):
             self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
 
         else:
-            dens_loss = None
+            dens_loss = 42.
                             
 
    
