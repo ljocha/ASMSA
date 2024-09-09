@@ -32,7 +32,8 @@ class Analysis:
         return lows, lows_rmsd
 
     def preapre(self):
-                
+
+        #gmx.editconf(f='npt.gro',input='Protein-H',o='npt_nh.pdb', ndef=True)
         gmx.trjconv(f='md.xtc',s='npt.gro',input='Protein-H',o='protein.xtc')
         gmx.trjconv(f='protein.xtc',s=f'npt_nh.pdb',pbc='nojump',input='Protein-H',o='MD_pbc.xtc')
         gmx.trjconv(f='MD_pbc.xtc',s=f'npt_nh.pdb',center=True,fit='rot+trans',input='Protein-H Protein-H Protein-H'.split(),o='MD_fit.xtc')
