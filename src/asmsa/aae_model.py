@@ -135,7 +135,7 @@ class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
             enc_layers=2,enc_seed=64,
             disc_layers=2,disc_seed=64,
-            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False):
+            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False,with_cv1_bias=False):
         super().__init__()
         
         self.hp = hp
@@ -150,6 +150,9 @@ class AAEModel(keras.models.Model):
             self.get_prior = _PriorImage(latent_dim,prior)
 
         self.with_density = with_density
+        self.with_cv1_bias = with_cv1_bias
+
+        assert not (with_density and with_cv1_bias)
             
         self.enc_seed = enc_seed
         self.disc_seed = disc_seed
@@ -285,6 +288,8 @@ class AAEModel(keras.models.Model):
         cheat_grads = ctape.gradient(cheat_loss,self.enc.trainable_weights)
         self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
 
+        dens_loss = 42.
+
         # FOLLOW DENSITIES
         if self.with_density:
             with tf.GradientTape() as detape:
@@ -298,11 +303,15 @@ class AAEModel(keras.models.Model):
             dens_grads = detape.gradient(dens_loss,self.enc.trainable_weights)
             self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
 
-        else:
-            dens_loss = 42.
+        # BIAS CV1
+        if self.with_cv1_bias:
+            with tf.GradientTape() as btape:
+                lows = self.enc(batch)
+                dens_loss = self.dens_loss_fn(in_batch[1],lows[:,0])
                             
+            bias_grads = btape.gradient(dens_loss,self.enc.trainable_weights)
+            self.optimizer.apply_gradients(zip(bias_grads,self.enc.trainable_weights))
 
-   
 
         return {
             'AE loss min' : tf.reduce_min(ae_multiloss),
