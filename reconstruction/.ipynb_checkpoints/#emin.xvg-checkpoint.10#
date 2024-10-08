@@ -1,0 +1,26 @@
+# This file was created Mon Oct  7 11:48:42 2024
+# Created by:
+#             :-) GROMACS - gmx energy, 2023.2-plumed_2.10.0_dev (-:
+# 
+# Executable:   /gromacs/AVX2_256_ts/bin/gmx
+# Data prefix:  /gromacs/AVX2_256_ts
+# Working dir:  /mnt/ASMSA/reconstruction
+# Command line:
+#   gmx energy -f min.edr -o emin.xvg
+# gmx energy is part of G R O M A C S:
+#
+# Green Red Orange Magenta Azure Cyan Skyblue
+#
+@    title "GROMACS Energies"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "(kJ/mol)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Dih. Rest."
+@ s1 legend "Potential"
+    0.000000    0.000006  279949198168686592.000000

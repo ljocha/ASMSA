@@ -1,0 +1,237 @@
+
+***   ***   290   ***   ***
+
+
+pod/asmsa-gmx-148-m7wt2 condition met
+             :-) GROMACS - gmx grompp, 2023.2-plumed_2.10.0_dev (-:
+
+Executable:   /gromacs/AVX2_256_ts/bin/gmx
+Data prefix:  /gromacs/AVX2_256_ts
+Working dir:  /mnt/ASMSA/reconstruction
+Command line:
+  gmx grompp -f min.mdp -c min.gro -p reference.top -o min.tpr -maxwarn 1
+
+Ignoring obsolete mdp entry 'ns_type'
+
+NOTE 1 [file min.mdp]:
+  With Verlet lists the optimal nstlist is >= 10, with GPUs >= 20. Note
+  that with the Verlet scheme, nstlist has no effect on the accuracy of
+  your simulation.
+
+Generating 1-4 interactions: fudge = 0.5
+
+NOTE 2 [file reference.top, line 2668]:
+  System has non-zero total charge: -1.000000
+  Total charge should normally be an integer. See
+  http://www.gromacs.org/Documentation/Floating_Point_Arithmetic
+  for discussion on how close it should be to an integer.
+
+
+
+atom name 2 in reference.top and min.gro does not match (H1 - H)
+
+atom name 8 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 30 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 61 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 64 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 78 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 102 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 131 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 141 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 148 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 154 in reference.top and min.gro does not match (HD1 - HD3)
+
+atom name 157 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 160 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 171 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 182 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 191 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 200 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 203 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 206 in reference.top and min.gro does not match (HD1 - HD3)
+
+atom name 221 in reference.top and min.gro does not match (HD1 - HD3)
+
+(more than 20 non-matching atom names)
+
+WARNING 1 [file reference.top, line 2668]:
+  31 non-matching atom names
+  atom names from reference.top will be used
+  atom names from min.gro will be ignored
+
+
+Number of degrees of freedom in T-Coupling group rest is 813.00
+The integrator does not provide a ensemble temperature, there is no system ensemble temperature
+
+NOTE 3 [file min.mdp]:
+  You are using a plain Coulomb cut-off, which might produce artifacts.
+  You might want to consider using PME electrostatics.
+
+
+
+There were 3 NOTEs
+
+There was 1 WARNING
+
+Back Off! I just backed up min.tpr to ./#min.tpr.1#
+
+GROMACS reminds you: "Never measure the height of a mountain until you have reached the top. Then you will see how low it was." (Dag Hammarskjold)
+
+Setting the LD random seed to -538968069
+
+Generated 2145 of the 2145 non-bonded parameter combinations
+
+Generated 2145 of the 2145 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+
+atom name 2 in reference.top and min.gro does not match (H1 - H)
+
+atom name 8 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 30 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 61 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 64 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 78 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 102 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 131 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 141 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 148 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 154 in reference.top and min.gro does not match (HD1 - HD3)
+
+atom name 157 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 160 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 171 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 182 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 191 in reference.top and min.gro does not match (HA1 - HA3)
+
+atom name 200 in reference.top and min.gro does not match (HB1 - HB3)
+
+atom name 203 in reference.top and min.gro does not match (HG1 - HG3)
+
+atom name 206 in reference.top and min.gro does not match (HD1 - HD3)
+
+atom name 221 in reference.top and min.gro does not match (HD1 - HD3)
+
+(more than 20 non-matching atom names)
+Analysing residue names:
+There are:    20    Protein residues
+Analysing Protein...
+
+This run will generate roughly 252 Mb of data
+pod/asmsa-gmx-148-m7wt2 condition met
+             :-) GROMACS - gmx mdrun, 2023.2-plumed_2.10.0_dev (-:
+
+Executable:   /gromacs/AVX2_256_ts/bin/gmx
+Data prefix:  /gromacs/AVX2_256_ts
+Working dir:  /mnt/ASMSA/reconstruction
+Command line:
+  gmx mdrun -deffnm min
+
+
+Back Off! I just backed up min.log to ./#min.log.1#
+Reading file min.tpr, VERSION 2023.2-plumed_2.10.0_dev (single precision)
+Using 1 MPI process
+
+Non-default thread affinity set, disabling internal thread affinity
+
+Using 1 OpenMP thread 
+
+
+Back Off! I just backed up min.trr to ./#min.trr.1#
+
+Back Off! I just backed up min.edr to ./#min.edr.1#
+
+Steepest Descents:
+   Tolerance (Fmax)   =  1.00000e+02
+   Number of steps    =        50000
+
+gmx:21629 terminated with signal 11 at PC=7ffa8c41b509 SP=7fff267ba940.  Backtrace:
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(+0xca3509)[0x7ffa8c41b509]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_Z8do_pairsiiPKiPK9t_iparamsPA3_KfPA4_fPA3_fPK5t_pbcPS4_PfN3gmx8ArrayRefIS4_EESI_NSH_IKbEENSH_IKtEEiPK10t_forcerecbRKNSG_12StepWorkloadEP17gmx_grppairener_tPi+0x1037)[0x7ffa8c4344e7]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(+0xcbdcf9)[0x7ffa8c435cf9]
+/usr/local/lib/libgomp.so.1(GOMP_parallel+0x3f)[0x7ffa7da0dedf]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_ZN12ListedForces9calculateEP13gmx_wallcyclePA3_KfPK8t_lambdaPK9t_commrecPK14gmx_multisim_tN3gmx19ArrayRefWithPaddingIKNSE_11BasicVectorIfEEEENSE_8ArrayRefISI_EEP8t_fcdataPK9history_tPNSE_12ForceOutputsEPK10t_forcerecPK5t_pbcP14gmx_enerdata_tP6t_nrnbNSK_IS2_EES13_S13_NSK_IKbEENSK_IKtEEiPiRKNSE_12StepWorkloadE+0x2fc)[0x7ffa8c43795c]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_Z8do_forceP8_IO_FILEPK9t_commrecPK14gmx_multisim_tRK10t_inputrecPN3gmx3AwhEP10gmx_enfrotPNSA_10ImdSessionEP6pull_tlP6t_nrnbP13gmx_wallcyclePK14gmx_localtop_tPA3_KfNSA_19ArrayRefWithPaddingINSA_11BasicVectorIfEEEEPK9history_tPNSA_16ForceBuffersViewEPA3_fPK9t_mdatomsP14gmx_enerdata_tNSA_8ArrayRefISQ_EEP10t_forcerecPNSA_21MdrunScheduleWorkloadEPNSA_19VirtualSitesHandlerEPfdP9gmx_edsamP24CpuPpLongRangeNonbondedsiRK22DDBalanceRegionHandler+0x2524)[0x7ffa8c37cd84]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(+0xd1a971)[0x7ffa8c492971]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_ZN3gmx15LegacySimulator8do_steepEv+0x5ca)[0x7ffa8c4b3bba]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_ZN3gmx8Mdrunner8mdrunnerEv+0x79ce)[0x7ffa8c4c7d0e]
+gmx(+0xcb4b)[0x55fe83605b4b]
+gmx(+0xccec)[0x55fe83605cec]
+/gromacs/AVX2_256_ts/bin/../lib/libgromacs.so.8(_ZN3gmx24CommandLineModuleManager3runEiPPc+0x375)[0x7ffa8bdd7185]
+gmx(+0x6e40)[0x55fe835ffe40]
+/lib/x86_64-linux-gnu/libc.so.6(+0x29d90)[0x7ffa8b328d90]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x80)[0x7ffa8b328e40]
+gmx(+0x6f25)[0x55fe835fff25]
+command terminated with exit code 1
+---------------------------------------------------------------------------
+GromacsError                              Traceback (most recent call last)
+File <timed exec>:19
+
+File /opt/conda/lib/python3.10/site-packages/gromacs/core.py:417, in Command.__call__(self, *args, **kwargs)
+    351 def __call__(self, *args, **kwargs):
+    352     """Run command with the given arguments::
+    353 
+    354        rc,stdout,stderr = command(*args, input=None, **kwargs)
+   (...)
+    415        (TODO: example for chaining commands)
+    416     """
+--> 417     return self.run(*args, **kwargs)
+
+File /opt/conda/lib/python3.10/site-packages/gromacs/core.py:178, in Command.run(self, *args, **kwargs)
+    176 """Run the command; args/kwargs are added or replace the ones given to the constructor."""
+    177 _args, _kwargs = self._combine_arglist(args, kwargs)
+--> 178 results, p = self._run_command(*_args, **_kwargs)
+    179 return results
+
+File /opt/conda/lib/python3.10/site-packages/gromacs/core.py:649, in GromacsCommand._run_command(self, *args, **kwargs)
+    647 """Execute the gromacs command; see the docs for __call__."""
+    648 result, p = super(GromacsCommand, self)._run_command(*args, **kwargs)
+--> 649 self.check_failure(result, command_string=p.command_string)
+    650 return result, p
+
+File /opt/conda/lib/python3.10/site-packages/gromacs/core.py:599, in GromacsCommand.check_failure(self, result, msg, command_string)
+    589     msg = "\n".join(
+    590         [
+    591             msg,
+   (...)
+    596         + formatted_message
+    597     )
+    598 if self.failuremode == "raise":
+--> 599     raise GromacsError(rc, msg)
+    600 elif self.failuremode == "warn":
+    601     warnings.warn(
+    602         msg + "\nError code: {0!r}\n".format(rc),
+    603         category=GromacsFailureWarning,
+    604     )
+
+GromacsError: [Errno 1] Gromacs tool failed
+Command invocation: gmx mdrun -deffnm min
