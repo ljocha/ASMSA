@@ -175,6 +175,11 @@ class Molecule:
 					raise ValueError("Reindexing not reliable with explicit hydrogens")
 				
 			self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top,ndx)
+			self.bonds = np.unique(self.bonds,axis=0)
+			self.angles = np.unique(self.angles,axis=0)
+			self.dihed4 = np.unique(self.dihed4,axis=0)
+			self.dihed9 = np.unique(self.dihed9,axis=0)
+
 			if (ff):
 			  btypes,atypes,d4types,d9types = _parse_ff(ff)
 			  self._match_bonds(btypes)
