@@ -156,10 +156,13 @@ def _match_type(atom,pattern):
 
 class Molecule:
 
-	def __init__(self,pdb = None,top = None, ndx = None,ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',fms=[], n_atoms=None):
+# ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',
+	def __init__(self,pdb = None,top = None, ndx = None, ff = None, fms=[], n_atoms=None):
 
 		if not top and not (fms and n_atoms):
 			raise ValueError("At least one of `top` or `fms+n_atoms` must be provided")
+
+		self.angles_th0 = None
 
 		if top:
 			if ndx:
@@ -172,10 +175,11 @@ class Molecule:
 					raise ValueError("Reindexing not reliable with explicit hydrogens")
 				
 			self.atypes,self.bonds,self.angles,self.dihed4,self.dihed9 = _parse_top(top,ndx)
-			btypes,atypes,d4types,d9types = _parse_ff(ff)
-			self._match_bonds(btypes)
-			self._match_angles(atypes)
-			self._match_dihed(d4types,d9types)
+			if (ff):
+			  btypes,atypes,d4types,d9types = _parse_ff(ff)
+			  self._match_bonds(btypes)
+			  self._match_angles(atypes)
+			  self._match_dihed(d4types,d9types)
 
 		self.fms = fms
 
