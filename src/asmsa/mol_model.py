@@ -29,8 +29,12 @@ class AnglesModel(torch.nn.Module):
         super().__init__()
         self.n_atoms = n_atoms
         self.angles = np.array(angles).reshape(-1, 3)
-        self.angles_th0 = torch.tensor(angles_th0, requires_grad=False)
-        self.angles_2rth0 = 2 * torch.reciprocal(self.angles_th0)
+        if angles_th0 is not None:
+          self.angles_th0 = torch.tensor(angles_th0, requires_grad=False)
+          self.angles_2rth0 = 2 * torch.reciprocal(self.angles_th0)
+        else:
+          self.angles_th0 = None
+          self.angles_2rth0 = None
 
   def forward(self, input):
     geoms = input.reshape(self.n_atoms, 3, -1)
@@ -40,11 +44,13 @@ class AnglesModel(torch.nn.Module):
     n2 = torch.linalg.norm(v2,axis=1)
 
     dot = torch.sum(v1 * v2, axis=1) / (n1 * n2)
-    aa = torch.arccos(dot * 0.999999) # numerical stability of arccos
 
-    # Why such a weird map? The input should be normalized anyway.
-    # If this map does not correspond to normalization, then it probably worsen the network performace anyway.
-    return (aa - .75 * self.angles_th0[:,None]) * self.angles_2rth0[:,None] # map 0.75 a0 -- 1.25 a0 to 0 -- 1
+    # if force field was specified, map the angle around it's relaxed value; use just it's cosine otherwise
+    if self.angles_th0:
+      aa = torch.arccos(dot * 0.999999) # numerical stability of arccos
+      return (aa - .75 * self.angles_th0[:,None]) * self.angles_2rth0[:,None] # map 0.75 a0 -- 1.25 a0 to 0 -- 1
+    else:
+      return dot
 
 
 class DihedralModel(torch.nn.Module):
@@ -59,13 +65,13 @@ class DihedralModel(torch.nn.Module):
     a23 = geoms[self.atoms[:, 2]] - geoms[self.atoms[:, 1]]
     a34 = geoms[self.atoms[:, 3]] - geoms[self.atoms[:, 2]]
 
-    a12 = torch.nn.functional.normalize(a12, p=2, dim=1)
-    a23 = torch.nn.functional.normalize(a23, p=2, dim=1)
-    a34 = torch.nn.functional.normalize(a34, p=2, dim=1)
+#    a12 = torch.nn.functional.normalize(a12, p=2, dim=1)
+#    a23 = torch.nn.functional.normalize(a23, p=2, dim=1)
+#    a34 = torch.nn.functional.normalize(a34, p=2, dim=1)
 
-    vp1 = torch.cross(a12,a23,axis=1)
-    vp2 = torch.cross(a23,a34,axis=1)
-    vp3 = torch.cross(vp1,a23,axis=1)
+    vp1 = torch.nn.functional.normalize(torch.cross(a12,a23,axis=1))
+    vp2 = torch.nn.functional.normalize(torch.cross(a23,a34,axis=1))
+    vp3 = torch.nn.functional.normalize(torch.cross(vp1,a23,axis=1))
 
     sp1 = torch.sum(vp1 * vp2, axis=1)
     sp2 = torch.sum(vp3 * vp2, axis=1)
@@ -77,7 +83,8 @@ class DihedralModel(torch.nn.Module):
     """
 
     #NOTE: Why adding two variables that determine each other? It the angle better?
-    return torch.nn.functional.normalize(torch.stack([-sp2, sp1]), p=2, dim=0).reshape(2*len(self.atoms), geoms.shape[2])
+    # return torch.nn.functional.normalize(torch.stack([-sp2, sp1]), p=2, dim=0).reshape(2*len(self.atoms), geoms.shape[2])
+    return torch.stack([-sp2, sp1]).reshape(2*len(self.atoms), geoms.shape[2])
 
 
 """
