@@ -4,6 +4,14 @@
 #env >&2
 
 img=cerit.io/ljocha/gromacs:2023-2-plumed-2-9-afed-pytorch-model-cv-2
+: ${REQUEST_CPU:=1}
+: ${REQUEST_RAM:=8}
+
+limit_cpu=1
+limit_ram=8
+if [ $REQUEST_CPU -gt $limit_cpu ]; then limit_cpu=$REQUEST_CPU; fi
+if [ $REQUEST_RAM -gt $limit_ram ]; then limit_ram=$REQUEST_RAM; fi
+
 
 input=$(cat -)
 
@@ -58,12 +66,12 @@ spec:
           value: '1'
         resources:
           requests:
-            cpu: '.1'
-            memory: 8Gi
+            cpu: '$REQUEST_CPU'
+            memory: ${REQUEST_RAM}Gi
             nvidia.com/gpu: 0
           limits:
-            cpu: '1'
-            memory: 8Gi
+            cpu: '$limit_cpu'
+            memory: ${limit_ram}Gi
             nvidia.com/gpu: 0
         volumeMounts:
         - name: vol-1
