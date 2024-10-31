@@ -6,6 +6,7 @@
 img=cerit.io/ljocha/gromacs:2023-2-plumed-2-9-afed-pytorch-model-cv-2
 : ${REQUEST_CPU:=1}
 : ${REQUEST_RAM:=8}
+: ${REQUEST_GPU:=0}
 
 limit_cpu=1
 limit_ram=8
@@ -68,11 +69,11 @@ spec:
           requests:
             cpu: '$REQUEST_CPU'
             memory: ${REQUEST_RAM}Gi
-            nvidia.com/gpu: 0
+            nvidia.com/gpu: ${REQUEST_GPU}
           limits:
             cpu: '$limit_cpu'
             memory: ${limit_ram}Gi
-            nvidia.com/gpu: 0
+            nvidia.com/gpu: ${REQUEST_GPU}
         volumeMounts:
         - name: vol-1
           mountPath: /mnt
