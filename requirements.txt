@@ -1,0 +1,19 @@
+dict_hash
+jupyter-server-proxy
+torch==1.12.1
+torchvision==0.13.1
+mdtraj
+keras_tuner
+tf_keras
+jupyterlab
+jupyterhub
+scikit-learn
+tensorflow-probability
+matplotlib
+# ipywidgets
+nglview
+networkx
+sympy
+onnx2torch
+kubernetes
+dill

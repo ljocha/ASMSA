@@ -59,7 +59,7 @@ class VisualizeCallback(tf.keras.callbacks.Callback):
 	def __init__(self,model=None,visualizer=None,freq=10,inputs=None,**kwargs):
 		super().__init__()
 		assert model
-		self.model = model
+		self.mymodel = model
 		self.inputs = inputs
 		self.freq = freq
 		if visualizer:
@@ -69,7 +69,7 @@ class VisualizeCallback(tf.keras.callbacks.Callback):
 
 	def on_epoch_end(self,epoch,logs=None):
 		if epoch % self.freq == self.freq - 1:
-			lows = self.model.call_enc(self.inputs).numpy()
+			lows = self.mymodel.call_enc(self.inputs).numpy()
 			self.visualizer.make_visualization(lows)
 			plt.pause(.01)
 
