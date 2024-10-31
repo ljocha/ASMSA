@@ -16,7 +16,7 @@ class GMX:
 		self.batchapi = k8s.client.BatchV1Api()
 		self.coreapi = k8s.client.CoreV1Api()
 
-	def start(self,cmd,input=None,gpus=0,cores=1,mem=4,wait=False,delete=False,tail=10):
+	def start(self,cmd,input=None,gpus=0,cores=1,mem=4,wait=False,delete=False,tail=10,nogmx=False):
 		
 		if self.name:
 			raise RuntimeError(f"job {self.name} already running, delete() it first")
@@ -28,7 +28,10 @@ class GMX:
 		if input is not None:
 			cmd += f' <<<"{input}"'
 		
-		kcmd = ['bash', '-c', 'gmx ' + cmd]
+		if nogmx:
+			kcmd = ['bash', '-c', cmd]
+		else:
+			kcmd = ['bash', '-c', 'gmx ' + cmd]
 		
 		yml = f"""\
 apiVersion: batch/v1
