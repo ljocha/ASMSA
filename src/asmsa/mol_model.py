@@ -169,23 +169,24 @@ class MoleculeModel(torch.nn.Module):
 
     return torch.cat(outputs, axis=0)
 
-  def get_indices(self):
-      out = dict()
-      bl = 0
-      al = 0
-      d4 = 0
-      d9 = 0
-      if self.bonds is not None:
-          bl=len(self.bonds)
-          out['bonds'] = (0,bl)
-      if self.angles is not None:
-          al=len(self.angles)
-          out['angles'] = (bl,bl+al)
-      if self.dihed4 is not None:
-          d4 = len(self.dihed4)
-          out['dihed4'] = (bl+al,bl+al+d4)
-      if self.dihed9 is not None:
-          d4 = len(self.dihed9)
-          out['dihed9'] = (bl+al+d4,bl+al+d4+d9)
+  @property
+  def bonds_indices(self):
+      return (0,len(self.bonds))
 
-      return out
+  @property
+  def angles_indices(self):
+      return (len(self.bonds),len(self.bonds)+len(self.angles))
+
+  @property
+  def dihed4_indices(self):
+      return (
+              len(self.bonds)+len(self.angles),
+              len(self.bonds)+len(self.angles)+len(self.dihed4)
+              )
+
+  @property
+  def dihed9_indices(self):
+      return (
+              len(self.bonds)+len(self.angles)+len(self.dihed4),
+              len(self.bonds)+len(self.angles)+len(self.dihed4)+len(self.dihed9)
+              )
