@@ -10,7 +10,10 @@ import joblib #parallelize updatings
 
 from PIL import Image
 from IPython.display import display, clear_output
+
 from ipywidgets import interact, IntSlider, HBox, VBox, Output
+
+
 from matplotlib.colors import Normalize
 from functools import lru_cache
 from datetime import datetime, timedelta
@@ -87,7 +90,11 @@ class Analysis:
         lows, lows_rmsd = self.latent_space()
         
         plt.ion()
+
         #fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 10))
+
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 10))
+
     
         l1, l2 = lows[:,0], lows[:,1]
 
@@ -123,14 +130,22 @@ class Analysis:
                 t = hills_data[:, 0] / 1000
                 cv1, cv2, hh = hills_data[:, 1], hills_data[:, 2], hills_data[:, 5]
 
-                fig = plt.figure(figsize=(10, 8))
+
+
+
+                fig = plt.figure(figsize=(12, 10))
+
                 
                 gs = GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
                 
                 ax1 = fig.add_subplot(gs[0, 0])  
                 ax2 = fig.add_subplot(gs[0, 1])  
+
                 ax3 = fig.add_subplot(gs[1, 0])
                 ax4 = fig.add_subplot(gs[1, 1])
+
+ 
+
                 
                 ax1.clear()
                 ax1.scatter(cv1, cv2, c=t, cmap=cmap, marker='.', s=1, zorder=1)
@@ -152,6 +167,7 @@ class Analysis:
                 ax2.set_title('AAE - Latent Space')
                 
                 ax3.clear()
+
                 ax3.hexbin(cv1, cv2, gridsize=50, cmap='seismic')
                 ax3.scatter(cv1[-1], cv2[-1], c='white', marker='x', s=50, zorder=1)
                 ax3.scatter(cv1[0], cv2[0], c='white', marker='o', s=50, zorder=1) 
@@ -169,6 +185,11 @@ class Analysis:
 
 
 
+
+
+
+
+
                 
                 plt.tight_layout()
 
@@ -178,6 +199,10 @@ class Analysis:
         
         except KeyboardInterrupt:
             plt.ioff()
+
+
+
+       
 
     def rmsd (self):
 
@@ -194,8 +219,11 @@ class Analysis:
         #plt.show()
         plt.savefig('rmsd.png')
 
+
     
         
+
+
     def highlights_and_dynamic(self, time_step=1000, cmap='rainbow'):
     
         conf_nh, traj_fit = self.preapre()
