@@ -152,3 +152,25 @@ class MoleculeModel(torch.nn.Module):
         ] + [fm(input) for fm in self.feature_maps]
 
     return torch.cat(outputs, axis=0)
+
+  @property
+  def bonds_indices(self):
+      return (0,len(self.bonds))
+
+  @property
+  def angles_indices(self):
+      return (len(self.bonds),len(self.bonds)+len(self.angles))
+
+  @property
+  def dihed4_indices(self):
+      return (
+              len(self.bonds)+len(self.angles),
+              len(self.bonds)+len(self.angles)+len(self.dihed4)
+              )
+
+  @property
+  def dihed9_indices(self):
+      return (
+              len(self.bonds)+len(self.angles)+len(self.dihed4),
+              len(self.bonds)+len(self.angles)+len(self.dihed4)+len(self.dihed9)
+              )
