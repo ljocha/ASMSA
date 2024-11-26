@@ -5,6 +5,7 @@ from tensorflow import keras
 import numpy as np
 import PIL
 import tensorflow_probability as tfp
+import math
 
 def _compute_number_of_neurons(layers,seed):
     neurons = [seed]
@@ -135,7 +136,7 @@ class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
             enc_layers=2,enc_seed=64,
             disc_layers=2,disc_seed=64,
-            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False):
+            prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False,with_cv1_bias=False):
         super().__init__()
         
         self.hp = hp
@@ -150,6 +151,9 @@ class AAEModel(keras.models.Model):
             self.get_prior = _PriorImage(latent_dim,prior)
 
         self.with_density = with_density
+        self.with_cv1_bias = with_cv1_bias
+
+        assert not (with_density and with_cv1_bias)
             
         self.enc_seed = enc_seed
         self.disc_seed = disc_seed
@@ -233,7 +237,10 @@ class AAEModel(keras.models.Model):
 
         super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']))
         self.ae_weights = self.enc.trainable_weights + self.dec.trainable_weights
-        self.optimizer.build(self.ae_weights + self.disc.trainable_weights)
+        if self.disc is not None:
+            self.optimizer.build(self.ae_weights + self.disc.trainable_weights)
+        else:
+            self.optimizer.build(self.ae_weights)
         self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
         self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
 
@@ -264,27 +271,32 @@ class AAEModel(keras.models.Model):
 
         # DISCRIMINATOR
 # XXX: Binary crossentropy from logits hardcoded
-        with tf.GradientTape() as dtape:
-            neg_pred = self.disc(reconstruct[1])
-            neg_losses = tf.reduce_mean(neg_pred*tf.random.uniform(tf.shape(neg_pred),1.,1.05),axis=0) 
-            pos_pred = self.disc(rand_low)
-            pos_losses = -tf.reduce_mean(pos_pred*tf.random.uniform(tf.shape(pos_pred),1.,1.05),axis=0)
-            disc_losses = neg_losses + pos_losses
-            disc_loss = tf.reduce_mean(disc_losses)
-
-        disc_grads = dtape.gradient(disc_loss,self.disc.trainable_weights)
-        self.optimizer.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
-
-# dtto
-        # CHEAT DISCRIMINATOR
-        with tf.GradientTape() as ctape:
-            cheat = self.disc(self.enc(batch))
-            cheat_losses = -tf.reduce_mean(cheat*tf.random.uniform(tf.shape(cheat),1.,1.05),axis=0)
-            cheat_loss = tf.reduce_mean(cheat_losses)
-
-        cheat_grads = ctape.gradient(cheat_loss,self.enc.trainable_weights)
-        self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
-
+        disc_losses = tf.constant([0.])
+        cheat_losses = tf.constant([0.])
+        if self.disc is not None:
+            with tf.GradientTape() as dtape:
+                neg_pred = self.disc(reconstruct[1])
+                neg_losses = tf.reduce_mean(neg_pred*tf.random.uniform(tf.shape(neg_pred),1.,1.05),axis=0) 
+                pos_pred = self.disc(rand_low)
+                pos_losses = -tf.reduce_mean(pos_pred*tf.random.uniform(tf.shape(pos_pred),1.,1.05),axis=0)
+                disc_losses = neg_losses + pos_losses
+                disc_loss = tf.reduce_mean(disc_losses)
+    
+            disc_grads = dtape.gradient(disc_loss,self.disc.trainable_weights)
+            self.optimizer.apply_gradients(zip(disc_grads,self.disc.trainable_weights))
+    
+    # dtto
+            # CHEAT DISCRIMINATOR
+            with tf.GradientTape() as ctape:
+                cheat = self.disc(self.enc(batch))
+                cheat_losses = -tf.reduce_mean(cheat*tf.random.uniform(tf.shape(cheat),1.,1.05),axis=0)
+                cheat_loss = tf.reduce_mean(cheat_losses)
+    
+            cheat_grads = ctape.gradient(cheat_loss,self.enc.trainable_weights)
+            self.optimizer.apply_gradients(zip(cheat_grads,self.enc.trainable_weights))
+    
+        dens_loss = 42.
+    
         # FOLLOW DENSITIES
         if self.with_density:
             with tf.GradientTape() as detape:
@@ -298,11 +310,15 @@ class AAEModel(keras.models.Model):
             dens_grads = detape.gradient(dens_loss,self.enc.trainable_weights)
             self.optimizer.apply_gradients(zip(dens_grads,self.enc.trainable_weights))
 
-        else:
-            dens_loss = 42.
+        # BIAS CV1
+        if self.with_cv1_bias:
+            with tf.GradientTape() as btape:
+                lows = self.enc(batch)
+                dens_loss = self.dens_loss_fn(in_batch[1],lows[:,0])
                             
+            bias_grads = btape.gradient(dens_loss,self.enc.trainable_weights)
+            self.optimizer.apply_gradients(zip(bias_grads,self.enc.trainable_weights))
 
-   
 
         return {
             'AE loss min' : tf.reduce_min(ae_multiloss),
@@ -330,4 +346,25 @@ class AAEModel(keras.models.Model):
     @tf.function
     def call_disc(self,low):
         return self.disc(low)
+
+
+class GaussianMixture(tfp.distributions.MultivariateNormalDiag):
+    def __init__(self,means,devs,weights):
+        super().__init__(loc=[0.,0.]) # XXX
+        self.dists = [ tfp.distributions.MultivariateNormalDiag(loc=loc,scale_diag=dev) for loc,dev in zip(means,devs) ]
+        self.weights = weights
+        assert sum(weights) == 1.0
+
+    def sample(self,shape):
+        if isinstance(shape,int): shape = (shape,)
+        flat = math.prod(shape)
+        nsamples = [ int(flat * w) for w in self.weights ]
+        nsamples[0] += flat-sum(nsamples)
+
+        samples = [ d.sample((n,)) for d,n in zip(self.dists,nsamples) ]
+        return tf.reshape(tf.concat(samples,axis=0),(*shape,2)) # XXX
+
+    def prob(self,sample):
+        probs = [ w*d.prob(sample) for w,d in zip(self.weights,self.dists)]
+        return tf.math.reduce_sum(tf.stack(probs,axis=0),axis=0)
 

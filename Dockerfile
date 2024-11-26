@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Prague
 
 USER root
-RUN apt update && apt install -y git g++ libz-dev procps curl wget docker.io && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && install -m 755 kubectl /usr/local/bin && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y git g++ libz-dev procps curl wget docker.io vim && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && install -m 755 kubectl /usr/local/bin && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /opt/ASMSA && chown -R jovyan /opt/ASMSA
 RUN adduser jovyan docker
@@ -26,8 +26,9 @@ RUN pip install git+https://github.com/onnx/tensorflow-onnx
 
 RUN cd /tmp && git clone --single-branch -b k8s https://github.com/ljocha/GromacsWrapper.git && pip install ./GromacsWrapper && rm -rf GromacsWrapper
 
-COPY IMAGE prepare.ipynb tune.ipynb train.ipynb md.ipynb /opt/ASMSA/
-COPY ions.mdp  minim-sol.mdp  npt.mdp  nvt.mdp /opt/ASMSA/
+#COPY IMAGE prepare.ipynb tune.ipynb train.ipynb md.ipynb /opt/ASMSA/
+#COPY ions.mdp  minim-sol.mdp  npt.mdp  nvt.mdp /opt/ASMSA/
+COPY README-hub.md /opt/ASMSA
 # COPY tuning.py tuning.sh start-notebook.sh /usr/local/bin/
 COPY start-notebook.sh /usr/local/bin/
 # WORKDIR /home/jovyan
