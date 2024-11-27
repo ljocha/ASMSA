@@ -157,10 +157,17 @@ def _match_type(atom,pattern):
 class Molecule:
 
 # ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',
-	def __init__(self,pdb = None,top = None, ndx = None, ff = None, fms=[], n_atoms=None):
+	def __init__(self,pdb = None,top = None, ndx = None, ff = None, fms=[], n_atoms=None,
+            bonds=None, angles=None, diheds=None):
 
-		if not top and not (fms and n_atoms):
-			raise ValueError("At least one of `top` or `fms+n_atoms` must be provided")
+		if not top and not n_atoms:
+			raise ValueError("`top` or `n_atoms` must be provided")
+
+        if top and (bonds or angles or dihed):
+            raise ValueError("Either `top` or `bonds/angles/dihed` can be specified, not both")
+
+        if not top and not fms and not bonds and not angles and not dihed:
+            raise ValueError("Without `top`, at least one of `fms/bonds/angles/dihed` must be provided")0
 
 		self.angles_th0 = None
 
@@ -185,6 +192,11 @@ class Molecule:
 			  self._match_bonds(btypes)
 			  self._match_angles(atypes)
 			  self._match_dihed(d4types,d9types)
+
+        else: # not top
+            self.bonds = np.unique(bonds,axis=0) if bonds else []
+            self.angles = np.unique(angles,axis=0) if angles else []
+            self.dihed4 = np.unique(dihed,axis=0) if dihed else []
 
 		self.fms = fms
 
