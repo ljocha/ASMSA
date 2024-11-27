@@ -128,7 +128,7 @@ Molecule model
 """
 
 class MoleculeModel(torch.nn.Module):
-  def __init__(self, n_atoms, bonds=[], angles=[], angles_th0=[], dihed4=[], dihed9=[], feature_maps=[]):
+  def __init__(self, n_atoms, bonds=None, angles=None, angles_th0=None, dihed4=None, dihed9=None, feature_maps=[]):
     super().__init__()
     self.n_atoms = n_atoms
     self.bonds = bonds
@@ -138,18 +138,23 @@ class MoleculeModel(torch.nn.Module):
     self.dihed9 = dihed9
     self.feature_maps = feature_maps
 
-    self.bonds_model = BondsModel(self.n_atoms, self.bonds)
-    self.angles_model = AnglesModel(self.n_atoms, self.angles, self.angles_th0)
-    self.dihed4_model = DihedralModel(self.n_atoms, self.dihed4)
-    self.dihed9_model = DihedralModel(self.n_atoms, self.dihed9)
+    self.bonds_model = None
+    self.angles_model = None
+    self.dihed4_model = None
+    self.dihed9_model = None
+
+    if bonds is not None: self.bonds_model = BondsModel(self.n_atoms, self.bonds)
+    if angles is not None: self.angles_model = AnglesModel(self.n_atoms, self.angles, self.angles_th0)
+    if dihed4 is not None: self.dihed4_model = DihedralModel(self.n_atoms, self.dihed4)
+    if dihed9 is not None: self.dihed9_model = DihedralModel(self.n_atoms, self.dihed9)
 
   def forward(self, input):
-    outputs = [
-        self.bonds_model(input),
-        self.angles_model(input),
-        self.dihed4_model(input),
-        self.dihed9_model(input),
-        ] + [fm(input) for fm in self.feature_maps]
+    outputs = []
+    if self.bonds_model: outputs.append(self.bonds_model(input))
+    if self.angles_model: outputs.append(self.angles_model(input))
+    if self.dihed4_model: outputs.append(self.dihed4_model(input))
+    if self.dihed9_model: outputs.append(self.dihed9_model(input))
+    outputs += [fm(input) for fm in self.feature_maps]
 
     return torch.cat(outputs, axis=0)
 
