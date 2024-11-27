@@ -134,11 +134,16 @@ def _masks(left,right):
 
 class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
-            enc_layers=2,enc_seed=64,
-            disc_layers=2,disc_seed=64,
+            enc_layers=None,enc_seed=None,
+            disc_layers=None,disc_seed=None,
             prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False,with_cv1_bias=False):
         super().__init__()
         
+        if enc_layers is None: enc_layers = hp['ae_number_of_layers']
+        if disc_layers is None: disc_layers = hp['disc_number_of_layers']
+        if enc_seed is None: enc_seed = hp['ae_neuron_number_seed']
+        if disc_seed is None: enc_seed = hp['disc_neuron_number_seed']
+
         self.hp = hp
         self.latent_dim = latent_dim
         if isinstance(prior,tfp.distributions.Distribution):
