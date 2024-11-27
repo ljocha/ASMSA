@@ -163,11 +163,11 @@ class Molecule:
 		if not top and not n_atoms:
 			raise ValueError("`top` or `n_atoms` must be provided")
 
-        if top and (bonds or angles or dihed):
-            raise ValueError("Either `top` or `bonds/angles/dihed` can be specified, not both")
+		if top and (bonds or angles or dihed):
+			raise ValueError("Either `top` or `bonds/angles/dihed` can be specified, not both")
 
-        if not top and not fms and not bonds and not angles and not dihed:
-            raise ValueError("Without `top`, at least one of `fms/bonds/angles/dihed` must be provided")0
+		if not top and not fms and not bonds and not angles and not dihed:
+			raise ValueError("Without `top`, at least one of `fms/bonds/angles/dihed` must be provided")
 
 		self.angles_th0 = None
 
@@ -193,10 +193,10 @@ class Molecule:
 			  self._match_angles(atypes)
 			  self._match_dihed(d4types,d9types)
 
-        else: # not top
-            self.bonds = np.unique(bonds,axis=0) if bonds else []
-            self.angles = np.unique(angles,axis=0) if angles else []
-            self.dihed4 = np.unique(dihed,axis=0) if dihed else []
+		else: # not top
+			self.bonds = np.unique(bonds,axis=0) if bonds else []
+			self.angles = np.unique(angles,axis=0) if angles else []
+			self.dihed4 = np.unique(dihed,axis=0) if dihed else []
 
 		self.fms = fms
 
