@@ -136,7 +136,7 @@ Molecule model
 """
 
 class MoleculeModel(torch.nn.Module):
-  def __init__(self, n_atoms, bonds=None, angles=None, angles_th0=None, dihed4=None, dihed9=None, feature_maps=[]):
+  def __init__(self, n_atoms, bonds=[], angles=None, angles_th0=None, dihed4=None, dihed9=None, feature_maps=[]):
     super().__init__()
     self.n_atoms = n_atoms
     self.bonds = bonds
@@ -151,39 +151,41 @@ class MoleculeModel(torch.nn.Module):
     self.dihed4_model = None
     self.dihed9_model = None
 
-    if bonds is not None: self.bonds_model = BondsModel(self.n_atoms, self.bonds)
+    self.bonds_model = BondsModel(self.n_atoms, self.bonds)
+    # XXX: was broken for bonds, not checking further yet
     if angles is not None: self.angles_model = AnglesModel(self.n_atoms, self.angles, self.angles_th0)
     if dihed4 is not None: self.dihed4_model = DihedralModel(self.n_atoms, self.dihed4)
     if dihed9 is not None: self.dihed9_model = DihedralModel(self.n_atoms, self.dihed9)
 
   def forward(self, input):
+    assert input.shape[0] == self.n_atoms
+    assert input.shape[1] == 3
     outputs = []
     if self.bonds_model: outputs.append(self.bonds_model(input))
     if self.angles_model: outputs.append(self.angles_model(input))
     if self.dihed4_model: outputs.append(self.dihed4_model(input))
     if self.dihed9_model: outputs.append(self.dihed9_model(input))
-    outputs += [fm(input) for fm in self.feature_maps]
+    if self.feature_maps: outputs += [fm(input) for fm in self.feature_maps]
 
     return torch.cat(outputs, axis=0)
 
-  @property
-  def bonds_indices(self):
-      return (0,len(self.bonds))
+  def get_indices(self):
+      out = dict()
+      bl = 0
+      al = 0
+      d4 = 0
+      d9 = 0
+      if self.bonds is not None:
+          bl=len(self.bonds)
+          out['bonds'] = (0,bl)
+      if self.angles is not None:
+          al=len(self.angles)
+          out['angles'] = (bl,bl+al)
+      if self.dihed4 is not None:
+          d4 = len(self.dihed4)
+          out['dihed4'] = (bl+al,bl+al+d4)
+      if self.dihed9 is not None:
+          d4 = len(self.dihed9)
+          out['dihed9'] = (bl+al+d4,bl+al+d4+d9)
 
-  @property
-  def angles_indices(self):
-      return (len(self.bonds),len(self.bonds)+len(self.angles))
-
-  @property
-  def dihed4_indices(self):
-      return (
-              len(self.bonds)+len(self.angles),
-              len(self.bonds)+len(self.angles)+len(self.dihed4)
-              )
-
-  @property
-  def dihed9_indices(self):
-      return (
-              len(self.bonds)+len(self.angles)+len(self.dihed4),
-              len(self.bonds)+len(self.angles)+len(self.dihed4)+len(self.dihed9)
-              )
+      return out
