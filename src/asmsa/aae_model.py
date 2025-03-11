@@ -240,15 +240,18 @@ class AAEModel(keras.models.Model):
 #            optimizer = keras.optimizers.legacy.__dict__[optimizer]
             optimizer = keras.optimizers.__dict__[optimizer]
 
-        super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']))
+        self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
+        self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
+
+        super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']),loss = self.ae_loss_fn)
         self.ae_weights = self.enc.trainable_weights + self.dec.trainable_weights
         if self.disc is not None:
             self.optimizer.build(self.ae_weights + self.disc.trainable_weights)
         else:
             self.optimizer.build(self.ae_weights)
-        self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
-        self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
 
+        self.enc.compile(loss = self.ae_loss_fn)
+        self.dec.compile(loss = self.ae_loss_fn)
 
     @tf.function
     def train_step(self,in_batch):
