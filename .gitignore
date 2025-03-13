@@ -4,6 +4,7 @@ notebooks/ipy_checkpoints/
 analysis/
 charmm22st.ff/
 results/
+prepare_data/
 model.pt
 decoder.pt
 encoder.pt
