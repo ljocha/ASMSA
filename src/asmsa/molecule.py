@@ -157,12 +157,23 @@ def _match_type(atom,pattern):
 class Molecule:
 
 # ff = os.path.dirname(os.path.abspath(__file__)) + '/ffbonded.itp',
-	def __init__(self,pdb = None,top = None, ndx = None, ff = None, fms=[], n_atoms=None):
+	def __init__(self,pdb = None,top = None, ndx = None, ff = None, fms=[], n_atoms=None,
+            bonds=None, angles=None, diheds=None):
 
-		if not top and not (fms and n_atoms):
-			raise ValueError("At least one of `top` or `fms+n_atoms` must be provided")
+		if not top and not n_atoms:
+			raise ValueError("`top` or `n_atoms` must be provided")
+
+		if top is not None and (bonds is not None or angles is not None or diheds is not None ):
+			raise ValueError("Either `top` or `bonds/angles/diheds` can be specified, not both")
+
+		if top is None and fms is None and bonds is None and angles is None and diheds is None:
+			raise ValueError("Without `top`, at least one of `fms/bonds/angles/diheds` must be provided")
 
 		self.angles_th0 = None
+		self.angles = None
+		self.bonds = None
+		self.dihed4 = None
+		self.dihed9 = None
 
 		if top:
 			if ndx:
@@ -186,23 +197,28 @@ class Molecule:
 			  self._match_angles(atypes)
 			  self._match_dihed(d4types,d9types)
 
+		else: # not top
+			self.bonds = np.unique(bonds,axis=0) if bonds is not None else []
+			self.angles = np.unique(angles,axis=0) if angles is not None else []
+			self.dihed4 = np.unique(diheds,axis=0) if diheds is not None else []
+
 		self.fms = fms
 
-		if top:
-			self.model = MoleculeModel(
-				len(self.atypes),
-				bonds=self.bonds,
-				angles=self.angles,
-				angles_th0=self.angles_th0,
-				dihed4=self.dihed4,
-				dihed9=self.dihed9,
-				feature_maps=self.fms
-			)
-		else:
-			self.model = MoleculeModel(
-				n_atoms,
-				feature_maps=self.fms
-			)
+#		if top:
+		self.model = MoleculeModel(
+			len(self.atypes) if top else n_atoms,
+			bonds=self.bonds,
+			angles=self.angles,
+			angles_th0=self.angles_th0,
+			dihed4=self.dihed4,
+			dihed9=self.dihed9,
+			feature_maps=self.fms
+		)
+#		else:
+#			self.model = MoleculeModel(
+#				n_atoms,
+#				feature_maps=self.fms
+#			)
 
 	def _match_bonds(self,btypes):
 		self.bonds_b0 = np.empty(self.bonds.shape[0],dtype=np.float32)

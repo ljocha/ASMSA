@@ -1,0 +1,13 @@
+data/p53
+datasets/
+notebooks/ipy_checkpoints/
+analysis/
+charmm22st.ff/
+results/
+prepare_data/
+model.pt
+decoder.pt
+encoder.pt
+features.pt
+inputs.py
+.ipynb_checkpoints

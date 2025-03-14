@@ -134,11 +134,16 @@ def _masks(left,right):
 
 class AAEModel(keras.models.Model):
     def __init__(self,molecule_shape,latent_dim=2,
-            enc_layers=2,enc_seed=64,
-            disc_layers=2,disc_seed=64,
+            enc_layers=None,enc_seed=None,
+            disc_layers=None,disc_seed=None,
             prior=tfp.distributions.Normal(loc=0, scale=1),hp=_default_hp,with_density=False,with_cv1_bias=False):
         super().__init__()
         
+        if enc_layers is None: enc_layers = hp['ae_number_of_layers']
+        if disc_layers is None: disc_layers = hp['disc_number_of_layers']
+        if enc_seed is None: enc_seed = hp['ae_neuron_number_seed']
+        if disc_seed is None: enc_seed = hp['disc_neuron_number_seed']
+
         self.hp = hp
         self.latent_dim = latent_dim
         if isinstance(prior,tfp.distributions.Distribution):
@@ -235,15 +240,18 @@ class AAEModel(keras.models.Model):
 #            optimizer = keras.optimizers.legacy.__dict__[optimizer]
             optimizer = keras.optimizers.__dict__[optimizer]
 
-        super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']))
+        self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
+        self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
+
+        super().compile(optimizer = optimizer(learning_rate=self.hp['learning_rate']),loss = self.ae_loss_fn)
         self.ae_weights = self.enc.trainable_weights + self.dec.trainable_weights
         if self.disc is not None:
             self.optimizer.build(self.ae_weights + self.disc.trainable_weights)
         else:
             self.optimizer.build(self.ae_weights)
-        self.ae_loss_fn = _losses[ae_loss if ae_loss else self.hp['ae_loss_fn']]
-        self.dens_loss_fn = keras.losses.MeanSquaredError(reduction=keras.losses.Reduction.NONE)
 
+        self.enc.compile(loss = self.ae_loss_fn)
+        self.dec.compile(loss = self.ae_loss_fn)
 
     @tf.function
     def train_step(self,in_batch):
