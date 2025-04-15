@@ -6,4 +6,6 @@ Populate it with running terminal and the command
 
     git clone https://github.com/ljocha/ASMSA
 
+    git clone git@github.com:tedeschg/ASMSA.git
+
 or some other fork you work with.
