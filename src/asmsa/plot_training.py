@@ -31,6 +31,7 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
         self.figsize = figsize
         self.freq = freq
         self.colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        self.markers = ['o', 's', '^', 'D', 'v', '*', 'p', 'x', '+', 'h']
         
     def on_train_begin(self, logs=None):
         # Flatten all metrics into a single list
@@ -52,8 +53,18 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
             if metric in logs:
                 self.metrics[metric].append(logs[metric])
             else:
-                # Skip metrics not in logs but don't add None or it'll break plotting
-                continue
+                # Handle nested metrics with double 'val_' prefix
+                # For example, val_val_AE loss min should match with val_AE loss min
+                # from logs if both refer to the same metric
+                metric_without_prefix = metric
+                if metric.startswith('val_val_'):
+                    metric_without_prefix = 'val_' + metric[8:]
+                    
+                if metric_without_prefix in logs:
+                    self.metrics[metric].append(logs[metric_without_prefix])
+                else:
+                    # Skip metrics not in logs but don't add None or it'll break plotting
+                    continue
         
         # Only update plot on specified frequency to avoid slowing down training
         if (epoch + 1) % self.freq == 0 or epoch == 0:
@@ -75,6 +86,7 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
             ax = axes[i]
             
             best_epochs = {}
+            plot_handles = []
             for j, metric_name in enumerate(group_metrics):
                 if metric_name not in self.metrics or len(self.metrics[metric_name]) == 0:
                     continue  # Skip metrics with no data
@@ -85,9 +97,12 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
                 best_idx = np.argmin(metric_values)
                 best_epochs[metric_name] = self.epochs[best_idx]
                 
-                # Plot the metric
+                # Plot the metric with consistent marker and line style
                 color = self.colors[j % len(self.colors)]
-                ax.plot(self.epochs, metric_values, 'o-', label=metric_name, color=color)
+                marker = self.markers[j % len(self.markers)]
+                line, = ax.plot(self.epochs, metric_values, marker=marker, linestyle='-', 
+                              label=metric_name, color=color, markersize=5)
+                plot_handles.append(line)
                 
                 # Add vertical line at best epoch
                 ax.axvline(self.epochs[best_idx], linestyle='--', color=color, alpha=0.5)
@@ -98,13 +113,16 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
             ax.set_ylabel('Value')
             ax.grid(True, linestyle='--', alpha=0.7)
             
-            # Create a legend with best epochs
+            # Create a legend with best epochs using the actual plot handles
             legend_labels = []
-            for metric_name, best_epoch in best_epochs.items():
-                best_value = self.metrics[metric_name][self.epochs.index(best_epoch)]
-                legend_labels.append(f"{metric_name} (best: {best_value:.6f} @ {best_epoch})")
+            for k, metric_name in enumerate(group_metrics):
+                if metric_name in best_epochs:
+                    best_epoch = best_epochs[metric_name]
+                    best_value = self.metrics[metric_name][self.epochs.index(best_epoch)]
+                    legend_labels.append(f"{metric_name} (best: {best_value:.6f} @ {best_epoch})")
             
-            ax.legend(legend_labels)
+            if plot_handles:
+                ax.legend(plot_handles, legend_labels)
         
         plt.tight_layout()
         plt.show()
