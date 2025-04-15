@@ -1,6 +1,7 @@
 datasets/
 notebooks/ipy_checkpoints/
 .ipynb_checkpoints
+.idea
 analysis/
 charmm22st.ff/
 results/
