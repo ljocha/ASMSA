@@ -290,9 +290,9 @@ class Molecule:
               self._match_dihed(d4types, d9types)
 
         else: # not top
-            self.bonds = np.unique(bonds, axis=0) if bonds is not None else []
-            self.angles = np.unique(angles, axis=0) if angles is not None else []
-            self.dihed4 = np.unique(diheds, axis=0) if diheds is not None else []
+            if bonds is not None: self.bonds = np.unique(bonds, axis=0)
+            if angles is not None: self.angles = np.unique(angles, axis=0)
+            if diheds is not None: self.dihed4 = np.unique(diheds, axis=0)
 
         self.fms = fms
 

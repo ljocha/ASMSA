@@ -16,6 +16,10 @@ import networkx as nx
 from sympy import nextprime
 
 
+def _norm_axis_1(x):
+    return torch.sqrt(torch.sum(x*x,dim=1))
+
+
 """
 Base molecule features - internal coordinates
 """
@@ -50,7 +54,9 @@ class BondsModel(torch.nn.Module):
     def forward(self, geoms):
 #        geoms = input.reshape(self.n_atoms, 3, -1)
         diffs = geoms[self.bonds[:, 0]] - geoms[self.bonds[:, 1]]
-        return torch.linalg.norm(diffs, axis=1)
+#        return torch.linalg.norm(diffs, axis=1)
+        return _norm_axis_1(diffs)
+        
 
 
 class AnglesModel(torch.nn.Module):
@@ -265,7 +271,7 @@ class MoleculeModel(torch.nn.Module):
     get_indices()
         Returns a dictionary mapping feature types to their index ranges in the output vector.
     """
-    def __init__(self, n_atoms, bonds=[], angles=None, angles_th0=None, dihed4=None, dihed9=None, feature_maps=[]):
+    def __init__(self, n_atoms, bonds=None, angles=None, angles_th0=None, dihed4=None, dihed9=None, feature_maps=None):
         super().__init__()
         self.n_atoms = n_atoms
         self.bonds = bonds
@@ -280,8 +286,7 @@ class MoleculeModel(torch.nn.Module):
         self.dihed4_model = None
         self.dihed9_model = None
 
-        self.bonds_model = BondsModel(self.n_atoms, self.bonds)
-        # XXX: was broken for bonds, not checking further yet
+        if bonds is not None: self.bonds_model = BondsModel(self.n_atoms, self.bonds)
         if angles is not None: self.angles_model = AnglesModel(self.n_atoms, self.angles, self.angles_th0)
         if dihed4 is not None: self.dihed4_model = DihedralModel(self.n_atoms, self.dihed4)
         if dihed9 is not None: self.dihed9_model = DihedralModel(self.n_atoms, self.dihed9)
