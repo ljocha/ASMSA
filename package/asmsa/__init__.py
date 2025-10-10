@@ -12,5 +12,6 @@ import networkx as nx
 from .mol_model import MoleculeModel, NBDistancesSparse, NBDistancesDense
 from .aae_model import AAEModel, GaussianMixture
 from .aae_hyper_model import AAEHyperModel
+from .class_model import AAEClassModel
 
 from .molecule import Molecule
