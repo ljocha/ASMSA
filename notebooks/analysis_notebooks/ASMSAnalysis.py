@@ -204,17 +204,16 @@ class Analysis:
             print("Visualization stopped by user")
 
 
-    def calculate_rmsd(self):
+    def calculate_rmsd(self, index):
         """Calculate and plot RMSD over trajectory."""
         conf_nh, traj_fit = self.prepare_trajectory()
        
         tr = md.load(traj_fit, top=conf_nh)
-        # Option to select only CA atoms
-        idx = tr.top.select("name CA")
-        tr.superpose(tr, atom_indices=idx)
         
+        tr.superpose(tr, atom_indices=index)
+
         # Calculate RMSD
-        rmsds = md.rmsd(tr, tr, 0, precentered=True)
+        rmsds = md.rmsd(tr, tr, 0, atom_indices=index, precentered=True)
     
         # Plot RMSD
         plt.figure(figsize=(10, 4))
@@ -225,6 +224,7 @@ class Analysis:
         plt.colorbar(label='RMSD (nm)')
         plt.savefig('rmsd.png', dpi=300)
         plt.show()
+        return rmsds
         
     def highlights_and_dynamic(self, cmap='rainbow', color_by_rmsd=True):
         """
