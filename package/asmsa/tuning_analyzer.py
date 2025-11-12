@@ -11,6 +11,7 @@ from pickle import UnpicklingError
 
 class TuningAnalyzer():
     def __init__(self,tuning=None):
+        # get latest tuning dir or the one selected by user
         self.tuning_dir = max(glob.glob(os.path.join(f'{os.getcwd()}/analysis', '*/')), key=os.path.getmtime) if tuning==None else tuning
         self.sorted_trials = self._analyze()
         print(f'Analyzing tuning from: {self.tuning_dir}')
@@ -42,33 +43,22 @@ class TuningAnalyzer():
 
         summary_writer.close()
 
-    
+
     def visualize_tuning(self, trial=None, num_trials=10):
         if trial:
             num_trials = len(self.sorted_trials)
+        
+        # populate x axis with number of epochs from first model of first trial
         first_model = list(self.sorted_trials[0]['results'].items())[0][0]
         num_epochs = len(self.sorted_trials[0]['results'][first_model]['ae_loss'])
         x = np.arange(start=0, stop=num_epochs, step=1)
-
-        colors_list = []
         
-        colors_list.extend(plt.cm.tab10(np.linspace(0, 1, 10)))      
+        # Create a distinct color palette
+        colors = plt.cm.tab10(np.linspace(0, 1, 10))
+        colors = np.vstack([colors, plt.cm.Set3(np.linspace(0, 1, 12))])
         
-        colors_list.extend(plt.cm.Set1(np.linspace(0, 1, 9)))        
-        colors_list.extend(plt.cm.Set2(np.linspace(0, 1, 8)))        
-        colors_list.extend(plt.cm.Set3(np.linspace(0, 1, 12)))       
-        
-        colors_list.extend(plt.cm.Dark2(np.linspace(0, 1, 8)))       
-        colors_list.extend(plt.cm.Paired(np.linspace(0, 1, 12)))     
-        
-        colors_list.extend(plt.cm.viridis(np.linspace(0, 1, 8)))     
-        colors_list.extend(plt.cm.plasma(np.linspace(0, 1, 8)))      
-        colors_list.extend(plt.cm.inferno(np.linspace(0, 1, 8)))     
-        colors_list.extend(plt.cm.cividis(np.linspace(0, 1, 8)))     
-        
-        colors = np.array(colors_list)
-        
-        measures = ['ae_loss', 'dn_loss', 'kl_div']
+        first_plot_saved = False
+    
         for i in range(len(self.sorted_trials)):
             if i == num_trials:
                 break
@@ -77,76 +67,58 @@ class TuningAnalyzer():
                 continue
             print(f'Trial ID: {_trial["trial_id"]}')
             
-            # Pre-calcolo dei limiti per metrica
-            limits = {}
-            for m in measures:
-                all_vals = np.concatenate([
-                    np.asarray(v[m]) for v in _trial['results'].values()
-                ])
-                min_v, max_v = float(np.min(all_vals)), float(np.max(all_vals))
-                if m in ('ae_loss', 'dn_loss'):
-                    if np.isclose(min_v, max_v):
-                        # caso piatto → apri un range "carino"
-                        if max_v == 0:
-                            ymin, ymax = -0.1, 0.1
-                        else:
-                            delta = abs(max_v) * 0.1
-                            ymin, ymax = max_v - delta, max_v + delta
-                    else:
-                        pad = 0.1 * (max_v - min_v)
-                        ymin, ymax = min_v - pad, max_v + pad
-                else:
-                    # kl_div: 0 → max con margine
-                    ymax = max_v if max_v > 0 else 1.0
-                    ymin, ymax = 0.0, ymax * 1.1
-                limits[m] = (ymin, ymax)
+            # Create a figure with 3 subplots
+            fig = plt.figure(figsize=(14, 8))  # Increased width for legend space
             
-            # Figura con 3 subplot
-            fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
-            fig.subplots_adjust(right=0.87)
+            # Dictionary to map models to colors
+            model_colors = {}
+            color_idx = 0
             
-            # Colori per modello - ora con molte più opzioni
-            model_colors, color_idx = {}, 0
+            # Per gestire una sola legenda comune
+            handles = []
+            labels = []
+            
             for k, v in _trial['results'].items():
+                # Assign a unique color to each model
                 if k not in model_colors:
                     model_colors[k] = colors[color_idx % len(colors)]
                     color_idx += 1
-                for ax, m in zip(axes, measures):
-                    y = np.asarray(v[m])
-                    ax.plot(x, y, label=k, color=model_colors[k], 
-                           linewidth=2.5,  
-                           alpha=0.9)      
-                    ax.set_ylabel(m)
-                    ax.set_ylim(*limits[m])
-                    ax.grid(True, alpha=0.3)  
+                    
+                for plot, measure in [(311, 'ae_loss'), (312, 'dn_loss'), (313, 'kl_div')]:
+                    ax = plt.subplot(plot)
+                    line, = plt.plot(x, _trial['results'][k][measure], label=k, color=model_colors[k])
+                    plt.ylabel(measure, fontsize=12)
+                    plt.xlabel("epoch", fontsize=12)
+                    plt.ylim([0, max(_trial['results'][k][measure])])
+                    plt.autoscale()
+                    if plot != 313:
+                        plt.xticks([])
+                    # raccogli handle e label per una sola legenda finale
+                    handles.append(line)
+                    labels.append(k)
             
-            axes[-1].set_xticks(np.arange(0, num_epochs + 1, 10))
-            axes[-1].set_xlabel("Epochs")
-            for ax in axes[:-1]:
-                ax.tick_params(labelbottom=False)
+            # rimuove duplicati nelle legende
+            unique = dict(zip(labels, handles))
             
-            handles, labels = axes[0].get_legend_handles_labels()
-            uniq_h, uniq_l = [], []
-            seen = set()
-            for h, lab in zip(handles, labels):
-                if lab not in seen:
-                    uniq_h.append(h); uniq_l.append(lab); seen.add(lab)
+            # riduce lo spazio verticale tra i plot
+            plt.subplots_adjust(hspace=0.15, right=0.83)  # più vicino e più spazio a destra
             
-            fig.legend(
-                uniq_h, uniq_l,
-                loc='center left',
-                bbox_to_anchor=(0.89, 0.5),
-                fontsize=11,
-                frameon=True, fancybox=True, framealpha=0.95,
-                edgecolor='0.4',
-                borderpad=0.8, labelspacing=0.6, handletextpad=0.7, handlelength=2.5
-            )
+            # legenda unica, leggermente più spostata a destra
+            fig.legend(unique.values(), unique.keys(),
+                       loc='center left', bbox_to_anchor=(0.88, 0.5),
+                       fontsize=12, title="Models")
             
-            plt.tight_layout(rect=[0, 0, 0.83, 1])
+            plt.xticks(range(0, num_epochs))
+            plt.tight_layout(rect=[0, 0, 0.85, 1])  # assicura che la legenda non tagli il grafico
+            
+            # Save only the first generated image
+            if not first_plot_saved:
+                plt.savefig(f'trial_{_trial["trial_id"]}_tuning_first_results.png', 
+                           bbox_inches='tight', dpi=600)
+                first_plot_saved = True
+                print(f"Saved first plot: trial_{_trial['trial_id']}_tuning_first_results.png")
+            
             plt.show()
-
-
-
 
     def get_best_hp(self,num_trials=10):
         def _get_beautiful_output(d):
