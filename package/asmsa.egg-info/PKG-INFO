@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: asmsa
+Version: 2.0.0
+Summary: Analysis and Sampling of Molecular Simulations by adversarial Autoencoders
+Home-page: https://gitlab.ics.muni.cz/3086/ASMSA
+Author: Ales Krenek
+Author-email: ljocha@ics.muni.cz
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+Requires-Dist: mdtraj
