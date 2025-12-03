@@ -125,4 +125,5 @@ class LiveTrainingPlot(tf.keras.callbacks.Callback):
                 ax.legend(plot_handles, legend_labels)
         
         plt.tight_layout()
+        plt.savefig("training_plot_epoch_{:03d}.png".format(self.epochs[-1]), dpi=600)
         plt.show()

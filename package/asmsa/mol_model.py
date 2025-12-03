@@ -224,15 +224,23 @@ class NBDistancesDense(BondsModel):
     
     Parameters:
     -----------
-    n_atoms : int
+    all_atoms : int
         Total number of atoms in the molecule.
+    atoms : list or None
+        Subset of atom indices to consider. If None, all atoms are used.
     """
-    def __init__(self, n_atoms):
-        G = complete_graph(n_atoms)
-
-        E = np.array([e for e in G.edges()])
-
-        super().__init__(n_atoms, np.array(E))
+    def __init__(self, all_atoms, atoms=None):
+        if atoms is None:
+            atoms = list(range(all_atoms))
+        
+        # Generate a complete graph of the atom subset
+        used_atoms = len(atoms)
+        G = complete_graph(used_atoms)
+        
+        # Map the edges back to the original atom indices
+        E = np.array([(atoms[a], atoms[b]) for a, b in G.edges()])
+        
+        super().__init__(all_atoms, np.array(E))
 
 
 """

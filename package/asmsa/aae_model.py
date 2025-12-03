@@ -23,7 +23,8 @@ class AAEModel(keras.models.Model):
         if enc_layers is None: enc_layers = hp['ae_number_of_layers']
         if disc_layers is None: disc_layers = hp['disc_number_of_layers']
         if enc_seed is None: enc_seed = hp['ae_neuron_number_seed']
-        if disc_seed is None: enc_seed = hp['disc_neuron_number_seed']
+        if disc_seed is None: disc_seed = hp['disc_neuron_number_seed']
+
 
         self.hp = hp
         self.latent_dim = latent_dim
@@ -88,7 +89,7 @@ class AAEModel(keras.models.Model):
                                      **_masks(enc_neurons[:, num + 1], enc_neurons[:, num]))(out)
             out = keras.layers.BatchNormalization(momentum=0.8, name=f'dec_bn_{num}')(out)
 
-        out = keras.layers.Dense(self.n_models * molecule_shape[0], name='dec_out', activation=hp['activation'],
+        out = keras.layers.Dense(self.n_models * molecule_shape[0], name='dec_out', activation=None, #hp['activation'],
                                  **_masks(enc_neurons[:, 0], [molecule_shape[0]] * self.n_models))(out)
         out = keras.layers.Reshape((self.n_models, molecule_shape[0]))(out)
 
@@ -261,8 +262,8 @@ class AAEModel(keras.models.Model):
             dens_loss = self.dens_loss_fn(in_batch[1], lows[:, 0])
 
         return {
-            'val_AE loss min': tf.reduce_min(ae_multiloss),
-            'val_disc loss min': tf.reduce_min(disc_losses),
+            'AE loss min': tf.reduce_min(ae_multiloss),
+            'disc loss min': tf.reduce_min(disc_losses),
         }
 
     def summary(self, expand_nested=True):

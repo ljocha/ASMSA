@@ -1,0 +1,3 @@
+[submodule "GromacsWrapper"]
+	path = GromacsWrapper
+	url = git@github.com:ljocha/GromacsWrapper
