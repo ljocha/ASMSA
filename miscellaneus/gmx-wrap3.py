@@ -138,8 +138,12 @@ except ApiException as e:
 
 while True:
     pods = v1.list_namespaced_pod(ns, label_selector=f"job={jobname}")
-    if len(pods.items) > 0 and pods.items[0].status.phase == 'Running': break
-    print(pods.items[0].status.phase)
+    if len(pods.items) > 0:
+        if pods.items[0].status.phase == 'Running': break
+        print(pods.items[0].status.phase)
+    else:
+        print(f'waiting for job/{jobname}')
+
     time.sleep(2)
 
 resp = stream(
