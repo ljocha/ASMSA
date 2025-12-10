@@ -1,3 +1,4 @@
+tensorflow[and-cuda]
 dict_hash
 jupyter-server-proxy
 torch==1.12.1
@@ -18,3 +19,5 @@ onnx2torch
 kubernetes
 dill
 nbstripout
+kubernetes
+git+https://github.com/onnx/tensorflow-onnx
