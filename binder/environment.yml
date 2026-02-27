@@ -12,19 +12,19 @@ dependencies:
  - pip:
    - nglview<4  # version 3.x has matching JS widgets extension
    - mdtraj 
-#   - tensorflow[and-cuda]
-#   - dict_hash
-#   - torch
-#   - torchvision
-#   - keras_tuner
-#   - tf_keras
-#   - scikit-learn
-#   - tensorflow-probability
-#   - networkx
-#   - sympy
-#   - onnx2torch
-#   - tf2onnx
-#   - GromacsWrapper
-#   - dill
-#   - nbstripout
-#   - git+https://github.com/ljocha/ASMSA.git#subdirectory=package
+   - tensorflow[and-cuda]
+   - dict_hash
+   - torch
+   - torchvision
+   - keras_tuner
+   - tf_keras
+   - scikit-learn
+   - tensorflow-probability
+   - networkx
+   - sympy
+   - onnx2torch
+   - tf2onnx
+   - GromacsWrapper
+   - dill
+   - nbstripout
+   - git+https://github.com/ljocha/ASMSA.git#subdirectory=package
