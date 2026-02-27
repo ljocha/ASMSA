@@ -1,0 +1,30 @@
+name: asmsa
+channels:
+  - conda-forge
+dependencies:
+ - python=3.13
+ - jupyterlab
+ - widgetsnbextension
+ - jupyterlab_widgets
+ - setuptools<67  # required by nglview (pkg_resources)
+ - pip
+ - kubernetes-client
+ - pip:
+   - nglview<4  # version 3.x has matching JS widgets extension
+   - mdtraj 
+#   - tensorflow[and-cuda]
+#   - dict_hash
+#   - torch
+#   - torchvision
+#   - keras_tuner
+#   - tf_keras
+#   - scikit-learn
+#   - tensorflow-probability
+#   - networkx
+#   - sympy
+#   - onnx2torch
+#   - tf2onnx
+#   - GromacsWrapper
+#   - dill
+#   - nbstripout
+#   - git+https://github.com/ljocha/ASMSA.git#subdirectory=package
