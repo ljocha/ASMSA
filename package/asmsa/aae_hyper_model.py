@@ -209,6 +209,7 @@ class AAEHyperModel(kt.HyperModel):
             .batch(hp['batch_size'],drop_remainder=True)\
             .prefetch(tf.data.experimental.AUTOTUNE)
 
+        model(validation) # XXX: force build
         super().fit(hp, model, train, callbacks=callbacks + [logcb], **kwargs)
 
         return logcb.get_metric(self.tuning_threshold)

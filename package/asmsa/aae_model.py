@@ -64,12 +64,12 @@ class AAEModel(keras.models.Model):
         inp = keras.Input(shape=molecule_shape)
         out = inp
 
-        out = keras.layers.Dense(np.sum(enc_neurons[:, 0]), activation=hp['activation'], name='enc_0')(out)
+        out = keras.layers.Dense(int(np.sum(enc_neurons[:, 0])), activation=hp['activation'], name='enc_0')(out)
         out = keras.layers.BatchNormalization(momentum=0.8, name=f'enc_bn_0')(out)
 
         for num in range(1, enc_neurons.shape[1]):
             name = f'enc_{num}'
-            out = keras.layers.Dense(np.sum(enc_neurons[:, num]), activation=hp['activation'],
+            out = keras.layers.Dense(int(np.sum(enc_neurons[:, num])), activation=hp['activation'],
                                      name=name, **_masks(enc_neurons[:, num - 1], enc_neurons[:, num]))(out)
             out = keras.layers.BatchNormalization(momentum=0.8, name=f'enc_bn_{num}')(out)
 
@@ -77,7 +77,7 @@ class AAEModel(keras.models.Model):
                                  **_masks(enc_neurons[:, -1], [latent_dim] * self.n_models))(out)
         latent = out
 
-        out = keras.layers.Dense(np.sum(enc_neurons[:, -1]), activation=hp['activation'],
+        out = keras.layers.Dense(int(np.sum(enc_neurons[:, -1])), activation=hp['activation'],
                                  name=f'dec_{enc_neurons.shape[1]}',
                                  **_masks([latent_dim] * self.n_models, enc_neurons[:, -1]))(out)
         out = keras.layers.BatchNormalization(momentum=0.8, name=f'dec_bn_{enc_neurons.shape[1]}')(out)
@@ -85,7 +85,7 @@ class AAEModel(keras.models.Model):
         # decoder layers are numbered in reverse so that neuron numbers match with encoder
         for num in reversed(range(enc_neurons.shape[1] - 1)):
             name = f'dec_{num}'
-            out = keras.layers.Dense(np.sum(enc_neurons[:, num]), activation=hp['activation'], name=name,
+            out = keras.layers.Dense(int(np.sum(enc_neurons[:, num])), activation=hp['activation'], name=name,
                                      **_masks(enc_neurons[:, num + 1], enc_neurons[:, num]))(out)
             out = keras.layers.BatchNormalization(momentum=0.8, name=f'dec_bn_{num}')(out)
 
@@ -99,13 +99,13 @@ class AAEModel(keras.models.Model):
 
         inp = keras.Input(shape=(latent_dim * self.n_models,))
         disc = inp
-        disc = keras.layers.Dense(np.sum(disc_neurons[:, 0]), name='disc_0',
+        disc = keras.layers.Dense(int(np.sum(disc_neurons[:, 0])), name='disc_0',
                                   **_masks([latent_dim] * self.n_models, disc_neurons[:, 0]))(disc)
         disc = keras.layers.LeakyReLU(alpha=0.2, name=f'disc_relu_{num}')(disc)
 
         for num in range(1, disc_neurons.shape[1]):
             name = f'disc_{num}'
-            disc = keras.layers.Dense(np.sum(disc_neurons[:, num]), name=name,
+            disc = keras.layers.Dense(int(np.sum(disc_neurons[:, num])), name=name,
                                       **_masks(disc_neurons[:, num - 1], disc_neurons[:, num]))(disc)
             disc = keras.layers.LeakyReLU(alpha=0.2, name=f'disc_relu_{num}')(disc)
 
