@@ -23,8 +23,10 @@ dependencies:
    - networkx
    - sympy
    - onnx2torch
-   - tf2onnx
    - GromacsWrapper
    - dill
    - nbstripout
    - git+https://github.com/ljocha/ASMSA.git#subdirectory=package
+   - git+https://github.com/onnx/tensorflow-onnx
+
+

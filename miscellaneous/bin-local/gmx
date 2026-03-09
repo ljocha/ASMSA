@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# gimage=cerit.io/ljocha/gromacs:2025-0-plumed-2-10-afed-pytorch-model-cv-2_ray-2-54-0
+gimage=cerit.io/ljocha/gromacs:2026-1-plumed-2-10-afed-pytorch-model-cv-2_ray-2-54-0
+
+# echo -- gmx "$@" >&2
+
+# must not use -t, in jupyter notebook it's not terminal and things go wrong
+
+docker run --rm -i -u $(id -u) -v $PWD:/work -w /work --gpus all $gimage gmx "$@"
